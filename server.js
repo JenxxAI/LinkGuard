@@ -21,8 +21,17 @@ const limiter = rateLimit({
 });
 app.use('/api', limiter);
 
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
+app.use(express.urlencoded({ extended: true, limit: '16kb' }));
+app.use(express.json({ limit: '256kb' }));
+
+// Security headers
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Permissions-Policy', 'interest-cohort=()');
+  next();
+});
 
 const VT_BASE = 'https://www.virustotal.com/api/v3';
 const API_KEY = process.env.VT_API_KEY;
@@ -53,6 +62,10 @@ app.post('/api/urls', async (req, res) => {
 
 // GET /api/analyses/:id — poll analysis result
 app.get('/api/analyses/:id', async (req, res) => {
+  // Validate: VT analysis IDs are base64url strings, typically ~40–80 chars
+  if (!/^[A-Za-z0-9_=-]{8,128}$/.test(req.params.id)) {
+    return res.status(400).json({ error: { message: 'Invalid analysis ID.' } });
+  }
   try {
     const r = await fetch(`${VT_BASE}/analyses/${req.params.id}`, {
       headers: { 'x-apikey': API_KEY },
@@ -65,9 +78,19 @@ app.get('/api/analyses/:id', async (req, res) => {
 });
 
 // GET /api/expand?url=... — follow redirects to reveal where short URLs lead
+// SSRF protection: only allow http/https to public addresses
+const PRIVATE_IP_RE = /^(127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.|::1|localhost)/i;
 app.get('/api/expand', async (req, res) => {
   const url = req.query.url?.trim();
   if (!url) return res.status(400).json({ error: 'Missing url' });
+  let parsed;
+  try { parsed = new URL(url); } catch { return res.status(400).json({ error: 'Invalid URL' }); }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return res.status(400).json({ error: 'Only http/https URLs are supported.' });
+  }
+  if (PRIVATE_IP_RE.test(parsed.hostname)) {
+    return res.status(400).json({ error: 'Private/internal addresses are not allowed.' });
+  }
   try {
     const r = await fetch(url, {
       method: 'HEAD',
@@ -92,11 +115,16 @@ setInterval(() => {
 }, 10 * 60 * 1000).unref();
 
 // POST /api/share — store scan result, return short key (no quota cost on retrieval)
+const SHARE_MAX_BYTES = 128 * 1024; // 128 KB cap per entry
 app.post('/api/share', (req, res) => {
   const { result, url } = req.body || {};
   if (!result || !url || typeof url !== 'string' || url.length > 2048) {
     return res.status(400).json({ error: 'Invalid payload.' });
   }
+  // Guard against oversized result objects
+  let size = 0;
+  try { size = JSON.stringify(result).length; } catch { return res.status(400).json({ error: 'Invalid payload.' }); }
+  if (size > SHARE_MAX_BYTES) return res.status(413).json({ error: 'Result too large to share.' });
   if (shareCache.size >= 500) return res.status(503).json({ error: 'Cache full.' });
   const key = Math.random().toString(36).slice(2, 10);
   shareCache.set(key, { result, url, ts: Date.now() });
