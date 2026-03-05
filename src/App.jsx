@@ -202,6 +202,8 @@ export default function App(){
   const [bulkRunning,setBulkRunning]=useState(false);
   const [dragOver,setDragOver]=useState(false);
   const pollRef=useRef(null);
+  const mountedRef=useRef(true);
+  useEffect(()=>()=>{mountedRef.current=false;},[]);
   const bulkCancelRef=useRef(false);
   const touchStartX=useRef(null);
   const [history,setHistory]=useState(()=>{try{return JSON.parse(localStorage.getItem('lg_history')||'[]');}catch{return[];}});
@@ -242,7 +244,9 @@ export default function App(){
   // ── single scan ──────────────────────────────────────────────────────
   const doScan=useCallback(async(su,silent=false)=>{
     if(!su?.trim()){if(!silent)setError("Enter a URL to scan.");return null;}
-    try{new URL(su.trim());}catch{if(!silent)setError("Enter a valid URL (must start with http:// or https://)");return null;}
+    let _parsed;
+    try{_parsed=new URL(su.trim());}catch{if(!silent)setError("Enter a valid URL (must start with http:// or https://)");return null;}
+    if(_parsed.protocol!=='http:'&&_parsed.protocol!=='https:'){if(!silent)setError("Only http:// and https:// URLs are supported.");return null;}
     // ── check local result cache (24h) ──────────────────────────────
     if(!silent){
       try{
@@ -280,10 +284,10 @@ export default function App(){
           let pd;try{pd=await pr.json();}catch{pollRef.current=setTimeout(poll,3000);return;}
           if(pd.data?.attributes?.status==="completed"){
             const attrs=pd.data.attributes;
-            if(!silent){setResult(attrs);setPhase("done");setLoading(false);navigator.vibrate?.(100);}
+            if(!silent&&mountedRef.current){setResult(attrs);setPhase("done");setLoading(false);navigator.vibrate?.(100);}
             const s=attrs?.stats||{},m=s.malicious||0,ss=s.suspicious||0,h=s.harmless||0,u=s.undetected||0,tot=m+ss+h+u+(s.timeout||0);
             const rk=getRisk(m,ss,tot);
-            setHistory(prev=>{const entry={url:su.trim(),label:rk.label,color:rk.color,score:rk.score,date:Date.now()};const next=[entry,...prev.filter(x=>x.url!==su.trim())].slice(0,20);localStorage.setItem('lg_history',JSON.stringify(next));return next;});
+            setHistory(prev=>{const entry={url:su.trim(),label:rk.label,color:rk.color,score:rk.score,date:Date.now()};const next=[entry,...prev.filter(x=>x.url!==su.trim())].slice(0,20);try{localStorage.setItem('lg_history',JSON.stringify(next));}catch{}return next;});
             if(!silent)document.title=`${m>0||ss>0?'⚠':'✓'} ${rk.label} — LinkGuard`;
             try{localStorage.setItem('lg_rslt_'+su.trim(),JSON.stringify({attrs,ts:Date.now()}));}catch{}
             if(!silent)setFromCache(false);
@@ -292,7 +296,7 @@ export default function App(){
         };poll();
       });
     }catch(e){
-      if(!silent){setError(e.message||"Error occurred.");setLoading(false);setPhase(null);}
+      if(!silent){setError(e.message||"Error occurred.");setLoading(false);setPhase(null);setFromCache(false);}
       throw e;
     }
   },[]);
@@ -332,7 +336,7 @@ export default function App(){
     if(navigator.share){try{await navigator.share({title:`LinkGuard — ${shortUrl(scannedUrl)}`,url:link});}catch(e){if(e?.name!=="AbortError"){navigator.clipboard.writeText(link);setShareMsg("Copied!");setTimeout(()=>setShareMsg(null),2000);}}}else{try{navigator.clipboard.writeText(link);setShareMsg("Copied!");setTimeout(()=>setShareMsg(null),2000);}catch{setShareMsg("Error");}}
   };
   const handleCopy=()=>{if(!result)return;const s=result.stats||{},m=s.malicious||0,ss=s.suspicious||0,tot=m+ss+(s.harmless||0)+(s.undetected||0),risk=getRisk(m,ss,tot);navigator.clipboard.writeText(`🔍 LinkGuard Scan\n🔗 ${scannedUrl}\n⚠️ Risk: ${risk.label} (${risk.score}/100)\n🔴 Malicious: ${m}  🟡 Suspicious: ${ss}  ✅ Harmless: ${s.harmless||0}\n📊 ${tot} engines checked`);setCopyMsg("Copied!");setTimeout(()=>setCopyMsg(null),2000);};
-  const handleExport=()=>{if(!result)return;const report={url:scannedUrl,scannedAt:result.date?new Date(result.date*1000).toISOString():new Date().toISOString(),risk:{label:risk.label,score:risk.score},stats:{malicious:mal,suspicious:sus,harmless:har,undetected:und,total:tot},flaggedEngines:flagged.map(([name,data])=>({name,category:data.category,result:data.result||null})),categories:result.categories||{},redirectChain:redirects,ssl:ssl?{issuer:ssl.cert_issuer,subject:ssl.cert_subject,expires:ssl.cert_validity_date?new Date(ssl.cert_validity_date*1000).toLocaleDateString():null}:null};const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`linkguard-${shortUrl(scannedUrl).replace(/[^a-z0-9]/gi,'-')}.json`;a.click();URL.revokeObjectURL(a.href);};
+  const handleExport=()=>{if(!result)return;const report={url:scannedUrl,scannedAt:result.date?new Date(result.date*1000).toISOString():new Date().toISOString(),risk:{label:risk.label,score:risk.score},stats:{malicious:mal,suspicious:sus,harmless:har,undetected:und,total:tot},flaggedEngines:flagged.map(([name,data])=>({name,category:data.category,result:data.result||null})),categories:result.categories||{},redirectChain:redirects,ssl:ssl?{issuer:ssl.cert_issuer,subject:ssl.cert_subject,expires:ssl.cert_validity_date?new Date(ssl.cert_validity_date*1000).toLocaleDateString():null}:null};const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'});const blobUrl=URL.createObjectURL(blob);const a=document.createElement('a');a.href=blobUrl;a.download=`linkguard-${shortUrl(scannedUrl).replace(/[^a-z0-9]/gi,'-')}.json`;a.click();URL.revokeObjectURL(blobUrl);};
 
   const reset=()=>{clearTimeout(pollRef.current);setResult(null);setError(null);setLoading(false);setPhase(null);setUrl("");setScannedUrl("");setExpanded(null);setFromCache(false);document.title="LinkGuard"};
 
@@ -572,13 +576,26 @@ export default function App(){
             {/* URL + action row */}
             <div style={{display:"flex",gap:"clamp(4px,2vw,8px)",alignItems:"center",padding:"clamp(8px,2vw,10px) clamp(10px,2.5vw,13px)",borderRadius:10,background:t.inputBg,border:`1px solid ${t.border}`,flexWrap:"wrap"}}>
               <span style={{fontFamily:"JetBrains Mono",fontSize:"clamp(9px,2.5vw,11px)",color:t.code,flex:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",minWidth:80}}>{scannedUrl}</span>
-              {[[copyMsg||"📋",handleCopy],[shareMsg||"🔗",handleShare],["⬇",handleExport],["🔁",()=>doScan(scannedUrl)]].map(([lbl,fn],i)=>(
+              {[
+                [copyMsg
+                  ?<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  :<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>,
+                 handleCopy,"Copy results"],
+                [shareMsg
+                  ?<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  :<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>,
+                 handleShare,"Share link"],
+                [<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+                 handleExport,"Export JSON"],
+                [<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>,
+                 ()=>doScan(scannedUrl),"Re-scan"],
+              ].map(([icon,fn,title],i)=>(
 
                 <button key={i} onClick={fn}
                   className="action-btn"
                   style={{border:`1px solid ${t.border}`,background:t.surface,color:t.muted}}
                   onMouseEnter={e=>e.currentTarget.style.borderColor=t.green} onMouseLeave={e=>e.currentTarget.style.borderColor=t.border}
-                  title={["Copy results","Share link","Export JSON","Re-scan"][i]}>{lbl}</button>
+                  title={title}>{icon}</button>
               ))}
             </div>
 

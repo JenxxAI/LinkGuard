@@ -2,10 +2,15 @@ import express from 'express';
 import { config } from 'dotenv';
 import rateLimit from 'express-rate-limit';
 import cors from 'cors';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import { existsSync } from 'fs';
 
 config();
 
 const app = express();
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const DIST = join(__dirname, 'dist');
 
 // CORS — only allow requests from the local Vite frontend (or FRONTEND_ORIGIN in prod)
 const allowedOrigin = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
@@ -52,8 +57,15 @@ app.post('/api/urls', async (req, res) => {
       method: 'POST',
       headers: { 'x-apikey': API_KEY, 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString(),
+      signal: AbortSignal.timeout(10000),
     });
     const data = await r.json();
+    if (!r.ok) {
+      const msg = r.status === 429
+        ? 'Scan limit reached — our analysis engine allows a limited number of requests per day. Please try again later.'
+        : `Analysis service returned an error (HTTP ${r.status}).`;
+      return res.status(r.status).json({ error: { message: msg } });
+    }
     res.status(r.status).json(data);
   } catch (e) {
     res.status(500).json({ error: { message: e.message } });
@@ -69,6 +81,7 @@ app.get('/api/analyses/:id', async (req, res) => {
   try {
     const r = await fetch(`${VT_BASE}/analyses/${req.params.id}`, {
       headers: { 'x-apikey': API_KEY },
+      signal: AbortSignal.timeout(10000),
     });
     const data = await r.json();
     res.status(r.status).json(data);
@@ -98,6 +111,11 @@ app.get('/api/expand', async (req, res) => {
       signal: AbortSignal.timeout(5000),
       headers: { 'User-Agent': 'LinkGuard/1.0' },
     });
+    // Guard against redirects that land on private/internal addresses
+    try {
+      const finalHostname = new URL(r.url).hostname;
+      if (PRIVATE_IP_RE.test(finalHostname)) return res.json({ resolved: url });
+    } catch {}
     res.json({ resolved: r.url });
   } catch {
     res.json({ resolved: url });
@@ -139,6 +157,15 @@ app.get('/api/share/:key', (req, res) => {
   }
   res.json({ result: entry.result, url: entry.url });
 });
+
+// ── Serve the built frontend (production) ────────────────────────────
+// In dev the Vite dev server handles the frontend; in production we serve
+// the pre-built dist/ folder from this same Express process.
+if (existsSync(DIST)) {
+  app.use(express.static(DIST));
+  // SPA fallback — let React Router (if ever added) or index.html handle the route
+  app.get('*', (_req, res) => res.sendFile(join(DIST, 'index.html')));
+}
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`LinkGuard API server running on :${PORT}`));
