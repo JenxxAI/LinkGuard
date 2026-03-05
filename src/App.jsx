@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 
 const DARK={bg:"#0a0a0f",surface:"#111118",border:"#1e1e2e",text:"#e8e6f0",muted:"#5a5a7a",code:"#a0a0c8",green:"#00ff9d",red:"#ff3c5c",yellow:"#ffe566",blue:"#5b8cff",inputBg:"#0d0d14",cardBg:"#13131f"};
 const LIGHT={bg:"#f0f0f5",surface:"#ffffff",border:"#e0dfe8",text:"#1a1a2e",muted:"#8888aa",code:"#444466",green:"#00a86b",red:"#e8294a",yellow:"#c47d00",blue:"#2f5fd4",inputBg:"#f8f8fc",cardBg:"#f4f4fa"};
@@ -13,8 +13,8 @@ function getRisk(m,s,tot){
   if(m<=10)return{score:p,label:"High Risk",color:"red"};
   return{score:p,label:"Dangerous",color:"red"};
 }
-function shortUrl(u){try{const x=new URL(u);return x.hostname+(x.pathname.length>1?x.pathname.slice(0,20)+(x.pathname.length>20?"…":""):"");}catch{return u.slice(0,35)+(u.length>35?"…":"");}}
-
+function shortUrl(u){try{const x=new URL(u);return x.hostname+(x.pathname.length>1?x.pathname.slice(0,20)+(x.pathname.length>20?"…":""):"");}catch{return u.slice(0,35)+(u.length>35?"…":"");}}const SHORT_DOMAINS=new Set(['bit.ly','t.co','tinyurl.com','ow.ly','rb.gy','is.gd','cutt.ly','buff.ly','short.io','shorturl.at','tiny.cc','lnkd.in']);
+function isShortUrl(u){try{return SHORT_DOMAINS.has(new URL(u).hostname);}catch{return false;}}
 // ── Radar Chart (SVG, no deps) ──────────────────────────────────────────
 function RadarChart({mal,sus,har,und,t}){
   const tot=mal+sus+har+und||1;
@@ -196,6 +196,21 @@ export default function App(){
   const pollRef=useRef(null);
   const bulkCancelRef=useRef(false);
   const touchStartX=useRef(null);
+  const [history,setHistory]=useState(()=>{try{return JSON.parse(localStorage.getItem('lg_history')||'[]');}catch{return[];}});
+  const [expanded,setExpanded]=useState(null);
+  const [expandLoading,setExpandLoading]=useState(false);
+
+  // ── expand short URLs ────────────────────────────────────────────────
+  useEffect(()=>{
+    if(!url||!isShortUrl(url)){setExpanded(null);setExpandLoading(false);return;}
+    const ctrl=new AbortController();
+    setExpandLoading(true);setExpanded(null);
+    fetch(`/api/expand?url=${encodeURIComponent(url)}`,{signal:ctrl.signal})
+      .then(r=>r.json())
+      .then(d=>{if(d.resolved&&d.resolved!==url)setExpanded(d.resolved);setExpandLoading(false);})
+      .catch(()=>setExpandLoading(false));
+    return()=>ctrl.abort();
+  },[url]);
 
   // ── single scan ──────────────────────────────────────────────────────
   const doScan=useCallback(async(su,silent=false)=>{
@@ -225,6 +240,9 @@ export default function App(){
             const attrs=pd.data.attributes;
             if(!silent){setResult(attrs);setPhase("done");setLoading(false);navigator.vibrate?.(100);}
             const s=attrs?.stats||{},m=s.malicious||0,ss=s.suspicious||0,h=s.harmless||0,u=s.undetected||0,tot=m+ss+h+u+(s.timeout||0);
+            const rk=getRisk(m,ss,tot);
+            setHistory(prev=>{const entry={url:su.trim(),label:rk.label,color:rk.color,score:rk.score,date:Date.now()};const next=[entry,...prev.filter(x=>x.url!==su.trim())].slice(0,20);localStorage.setItem('lg_history',JSON.stringify(next));return next;});
+            if(!silent)document.title=`${m>0||ss>0?'⚠':'✓'} ${rk.label} — LinkGuard`;
             resolve({malicious:m,suspicious:ss,harmless:h,undetected:u,total:tot,attrs});
           }else{pollRef.current=setTimeout(poll,3000);}
         };poll();
@@ -267,7 +285,7 @@ export default function App(){
   const handleShare=async()=>{const link=`${window.location.href.split("#")[0]}#${btoa(JSON.stringify({u:scannedUrl}))}`;if(navigator.share){try{await navigator.share({title:`LinkGuard — ${shortUrl(scannedUrl)}`,url:link});}catch(e){if(e?.name!=="AbortError"){navigator.clipboard.writeText(link);setShareMsg("Copied!");setTimeout(()=>setShareMsg(null),2000);}}}else{try{navigator.clipboard.writeText(link);setShareMsg("Copied!");setTimeout(()=>setShareMsg(null),2000);}catch{setShareMsg("Error");}}};
   const handleCopy=()=>{if(!result)return;const s=result.stats||{},m=s.malicious||0,ss=s.suspicious||0,tot=m+ss+(s.harmless||0)+(s.undetected||0),risk=getRisk(m,ss,tot);navigator.clipboard.writeText(`🔍 LinkGuard Scan\n🔗 ${scannedUrl}\n⚠️ Risk: ${risk.label} (${risk.score}/100)\n🔴 Malicious: ${m}  🟡 Suspicious: ${ss}  ✅ Harmless: ${s.harmless||0}\n📊 ${tot} engines checked`);setCopyMsg("Copied!");setTimeout(()=>setCopyMsg(null),2000);};
 
-  const reset=()=>{clearTimeout(pollRef.current);setResult(null);setError(null);setLoading(false);setPhase(null);setUrl("");setScannedUrl("");};
+  const reset=()=>{clearTimeout(pollRef.current);setResult(null);setError(null);setLoading(false);setPhase(null);setUrl("");setScannedUrl("");setExpanded(null);document.title="LinkGuard";};
 
   // ── derived state ────────────────────────────────────────────────────
   const s=result?.stats||{},mal=s.malicious||0,sus=s.suspicious||0,har=s.harmless||0,und=s.undetected||0,tot=mal+sus+har+und+(s.timeout||0);
@@ -358,6 +376,7 @@ export default function App(){
             <div className={`scan-row${dragOver?" dropzone-active":""}`} onDragOver={e=>{e.preventDefault();setDragOver(true);}} onDragLeave={()=>setDragOver(false)} onDrop={onDrop}
               style={{padding:dragOver?"8px":"0",borderRadius:12,border:`2px dashed ${dragOver?t.green:"transparent"}`,transition:"all 0.2s"}}>
               <input type="url" inputMode="url" value={url} onChange={e=>setUrl(e.target.value)} onKeyDown={e=>e.key==="Enter"&&!loading&&doScan(url)}
+                onPaste={e=>{const text=e.clipboardData.getData('text').trim();if(text.startsWith('http')&&!loading)setTimeout(()=>doScan(text),50);}}
                 placeholder="https://example.com"
                 className="url-input"
                 style={{background:t.inputBg,border:`1px solid ${t.border}`,color:t.text}}
@@ -368,6 +387,13 @@ export default function App(){
                 {loading?"…":result?"Reset":"Scan →"}
               </button>
             </div>
+            {(expandLoading||expanded)&&(
+              <div style={{marginTop:6,padding:"6px 10px",borderRadius:8,background:t.inputBg,border:`1px solid ${t.border}`,fontSize:10,fontFamily:"JetBrains Mono",display:"flex",alignItems:"flex-start",gap:6}}>
+                {expandLoading
+                  ?<span style={{color:t.muted}}>↗ Resolving short URL…</span>
+                  :<><span style={{color:t.muted,flexShrink:0}}>Resolves to:</span><span style={{color:t.green,wordBreak:"break-all"}}>{expanded}</span></>}
+              </div>
+            )}
           </div>
         ):(
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
@@ -392,6 +418,32 @@ export default function App(){
               </div>
             )}
           </div>
+        )}
+
+        {/* Scan history */}
+        {!loading&&!result&&!bulkMode&&history.length>0&&(
+          <details>
+            <summary style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,letterSpacing:1,textTransform:"uppercase",userSelect:"none",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"2px 0"}}>
+              <span>Recent ({history.length})</span>
+              <span style={{color:t.red,padding:"2px 6px",cursor:"pointer"}} onClick={e=>{e.preventDefault();setHistory([]);localStorage.removeItem('lg_history');}}>Clear</span>
+            </summary>
+            <div style={{display:"flex",flexDirection:"column",gap:4,marginTop:8,maxHeight:200,overflowY:"auto"}}>
+              {history.map((item,i)=>{
+                const c=t[item.color]||t.muted;
+                return(
+                  <button key={i} onClick={()=>{setUrl(item.url);doScan(item.url);}}
+                    style={{display:"flex",alignItems:"center",gap:8,padding:"8px 11px",borderRadius:9,background:t.inputBg,border:`1px solid ${t.border}`,cursor:"pointer",textAlign:"left",width:"100%",transition:"border-color 0.2s"}}
+                    onMouseEnter={e=>e.currentTarget.style.borderColor=t.green}
+                    onMouseLeave={e=>e.currentTarget.style.borderColor=t.border}>
+                    <div style={{width:6,height:6,borderRadius:"50%",background:c,flexShrink:0}}/>
+                    <span style={{flex:1,fontFamily:"JetBrains Mono",fontSize:10,color:t.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{shortUrl(item.url)}</span>
+                    <span style={{fontSize:9,fontFamily:"JetBrains Mono",color:c,flexShrink:0}}>{item.label}</span>
+                    <span style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,flexShrink:0}}>{new Date(item.date).toLocaleDateString()}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </details>
         )}
 
         {/* Loading */}

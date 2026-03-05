@@ -64,5 +64,22 @@ app.get('/api/analyses/:id', async (req, res) => {
   }
 });
 
+// GET /api/expand?url=... — follow redirects to reveal where short URLs lead
+app.get('/api/expand', async (req, res) => {
+  const url = req.query.url?.trim();
+  if (!url) return res.status(400).json({ error: 'Missing url' });
+  try {
+    const r = await fetch(url, {
+      method: 'HEAD',
+      redirect: 'follow',
+      signal: AbortSignal.timeout(5000),
+      headers: { 'User-Agent': 'LinkGuard/1.0' },
+    });
+    res.json({ resolved: r.url });
+  } catch {
+    res.json({ resolved: url });
+  }
+});
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`LinkGuard API server running on :${PORT}`));
