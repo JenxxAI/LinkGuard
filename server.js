@@ -46,6 +46,9 @@ if (!API_KEY) {
   process.exit(1);
 }
 
+// GET /api/health — uptime check for Render / monitoring
+app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
+
 // POST /api/urls — submit a URL for scanning
 app.post('/api/urls', async (req, res) => {
   const url = req.body?.url?.trim();
