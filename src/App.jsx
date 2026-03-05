@@ -209,6 +209,7 @@ export default function App(){
   const [expandLoading,setExpandLoading]=useState(false);
   const [copiedEngine,setCopiedEngine]=useState(null);
   const [showLegend,setShowLegend]=useState(false);
+  const [showAbout,setShowAbout]=useState(false);
   const qrInputRef=useRef(null);
 
   // ── expand short URLs ────────────────────────────────────────────────
@@ -470,38 +471,6 @@ export default function App(){
           </div>
         )}
 
-        {/* About / Guide */}
-        {!loading&&!result&&!bulkMode&&(
-          <details style={{marginTop:4}}>
-            <summary style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,letterSpacing:1,textTransform:"uppercase",userSelect:"none",padding:"2px 0",cursor:"pointer"}}>
-              About &amp; How to Use ▾
-            </summary>
-            <div style={{display:"flex",flexDirection:"column",gap:12,marginTop:12,padding:"14px 16px",borderRadius:12,background:t.inputBg,border:`1px solid ${t.border}`}}>
-              <div>
-                <p style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:800,fontSize:13,color:t.text,marginBottom:4}}>What is LinkGuard?</p>
-                <p style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:12,color:t.muted,lineHeight:1.6}}>LinkGuard is a free URL safety scanner powered by <strong style={{color:t.text}}>70+ security engines</strong>. Paste any link before clicking it — LinkGuard checks it for malware, phishing, scams, and suspicious redirects in seconds.</p>
-              </div>
-              <div style={{width:"100%",height:1,background:t.border}}/>
-              <div>
-                <p style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:800,fontSize:13,color:t.text,marginBottom:8}}>📖 How to use</p>
-                <div style={{display:"flex",flexDirection:"column",gap:7}}>
-                  {[["🔗","Paste or type a URL","Drop any link into the input. Pasting auto-starts the scan."],["🔍","Hit Scan","Results arrive in 15–30 seconds as 70+ engines analyse the link."],["📊","Read the result","Overview shows your risk score. Swipe or tap tabs for details: Intel, Charts, Engines, SSL."],["📷","QR codes","Tap \u2018Scan QR Code\u2019 to decode a QR image directly from your camera or photo library."],["📃","Bulk scan","Toggle Bulk mode to paste multiple URLs at once — useful for checking several links quickly."],["⬇","Export","Download a full JSON report of any scan result for sharing or record-keeping."]].map(([icon,title,desc])=>(
-                    <div key={title} style={{display:"flex",gap:10,alignItems:"flex-start"}}>
-                      <span style={{fontSize:14,flexShrink:0,marginTop:1}}>{icon}</span>
-                      <div><span style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:700,fontSize:12,color:t.text}}>{title} — </span><span style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:12,color:t.muted}}>{desc}</span></div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div style={{width:"100%",height:1,background:t.border}}/>
-              <div style={{display:"flex",gap:8,padding:"8px 10px",borderRadius:9,background:`${t.yellow}0d`,border:`1px solid ${t.yellow}33`}}>
-                <span style={{fontSize:13,flexShrink:0}}>⚠️</span>
-                <p style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:11,color:t.muted,lineHeight:1.6}}>LinkGuard uses the <strong style={{color:t.text}}>VirusTotal free tier</strong> — limited to 500 scans/day and 4/minute. Results reflect the last cached analysis; click Re-scan if the data is stale.</p>
-              </div>
-            </div>
-          </details>
-        )}
-
         {/* Scan history */}
         {!loading&&!result&&!bulkMode&&history.length>0&&(
           <details>
@@ -724,6 +693,65 @@ export default function App(){
           ↺ New Scan
         </button>
       )}
+      {/* ── About / Guide ──────────────────────────────────────── */}
+      <div style={{width:"100%",maxWidth:560,marginTop:16}}>
+        <button onClick={()=>setShowAbout(v=>!v)}
+          style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"11px 16px",borderRadius:12,border:`1px solid ${t.border}`,background:t.surface,cursor:"pointer",transition:"border-color 0.2s"}}
+          onMouseEnter={e=>e.currentTarget.style.borderColor=t.green}
+          onMouseLeave={e=>e.currentTarget.style.borderColor=t.border}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+            </svg>
+            <span style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:700,fontSize:12,color:t.muted}}>About &amp; How to Use</span>
+          </div>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+            style={{transition:"transform 0.2s",transform:showAbout?"rotate(180deg)":"rotate(0deg)"}}>
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </button>
+        {showAbout&&(
+          <div style={{display:"flex",flexDirection:"column",gap:14,marginTop:4,padding:"16px",borderRadius:12,border:`1px solid ${t.border}`,background:t.surface}}>
+            {/* What is LinkGuard */}
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              <div style={{display:"flex",alignItems:"center",gap:7}}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={t.green} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                <span style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:800,fontSize:13,color:t.text}}>What is LinkGuard?</span>
+              </div>
+              <p style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:12,color:t.muted,lineHeight:1.65,paddingLeft:20}}>A free URL safety scanner powered by <strong style={{color:t.text}}>70+ security engines</strong>. Paste any link before clicking it — LinkGuard checks for malware, phishing, scams, and suspicious redirects in seconds.</p>
+            </div>
+            <div style={{width:"100%",height:1,background:t.border}}/>
+            {/* How to use steps */}
+            <div style={{display:"flex",flexDirection:"column",gap:4}}>
+              <span style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:800,fontSize:13,color:t.text,marginBottom:4}}>How to use</span>
+              {[
+                {icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,title:"Paste or type a URL",desc:"Pasting auto-starts the scan instantly."},
+                {icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,title:"Hit Scan",desc:"70+ engines analyse the link in 15–30 seconds."},
+                {icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h.01M18 14h.01M14 18h.01M18 18h.01"/></svg>,title:"QR codes",desc:"Tap 'Scan QR Code' to decode a QR image from your camera or photos."},
+                {icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>,title:"Bulk scan",desc:"Toggle Bulk mode to check multiple URLs at once."},
+                {icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,title:"Export report",desc:"Download a full JSON report for sharing or record-keeping."},
+                {icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>,title:"Read the tabs",desc:"Overview · Intel · Charts · Engines · SSL — swipe or tap to explore."},
+              ].map(({icon,title,desc})=>(
+                <div key={title} style={{display:"flex",gap:10,alignItems:"flex-start",padding:"7px 10px",borderRadius:9,background:t.inputBg}}>
+                  <span style={{flexShrink:0,marginTop:2}}>{icon}</span>
+                  <div><span style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:700,fontSize:12,color:t.text}}>{title} — </span><span style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:12,color:t.muted}}>{desc}</span></div>
+                </div>
+              ))}
+            </div>
+            <div style={{width:"100%",height:1,background:t.border}}/>
+            {/* Rate limit note */}
+            <div style={{display:"flex",gap:9,padding:"9px 11px",borderRadius:9,background:`${t.yellow}0d`,border:`1px solid ${t.yellow}33`,alignItems:"flex-start"}}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={t.yellow} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0,marginTop:1}}>
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+              <p style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:11,color:t.muted,lineHeight:1.65}}>Uses the <strong style={{color:t.text}}>VirusTotal free tier</strong> — 500 scans/day, 4/min. Results are cached; hit Re-scan if data looks stale.</p>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* ── Footer ───────────────────────────────────────────── */}
       <div style={{width:"100%",maxWidth:560,marginTop:24,display:"flex",flexDirection:"column",alignItems:"center",gap:12,paddingBottom:`calc(clamp(16px,4vw,24px) + env(safe-area-inset-bottom))`}}>
         {/* Acentra Tech banner */}
