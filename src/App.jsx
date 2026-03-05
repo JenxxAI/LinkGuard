@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useCallback } from "react";
 
 const DARK={bg:"#0a0a0f",surface:"#111118",border:"#1e1e2e",text:"#e8e6f0",muted:"#5a5a7a",code:"#a0a0c8",green:"#00ff9d",red:"#ff3c5c",yellow:"#ffe566",blue:"#5b8cff",inputBg:"#0d0d14",cardBg:"#13131f"};
 const LIGHT={bg:"#f0f0f5",surface:"#ffffff",border:"#e0dfe8",text:"#1a1a2e",muted:"#8888aa",code:"#444466",green:"#00a86b",red:"#e8294a",yellow:"#c47d00",blue:"#2f5fd4",inputBg:"#f8f8fc",cardBg:"#f4f4fa"};
@@ -13,7 +13,6 @@ function getRisk(m,s,tot){
   if(m<=10)return{score:p,label:"High Risk",color:"red"};
   return{score:p,label:"Dangerous",color:"red"};
 }
-function timeAgo(ts){const d=Date.now()-ts;if(d<60000)return"just now";if(d<3600000)return`${Math.floor(d/60000)}m ago`;if(d<86400000)return`${Math.floor(d/3600000)}h ago`;return`${Math.floor(d/86400000)}d ago`;}
 function shortUrl(u){try{const x=new URL(u);return x.hostname+(x.pathname.length>1?x.pathname.slice(0,20)+(x.pathname.length>20?"…":""):"");}catch{return u.slice(0,35)+(u.length>35?"…":"");}}
 
 // ── Radar Chart (SVG, no deps) ──────────────────────────────────────────
@@ -154,21 +153,7 @@ function InfoRow({icon,label,value,color,t,mono=true}){
   );
 }
 
-// ── History Item ───────────────────────────────────────────────────────
-function HistoryItem({item,onReload,t}){
-  const risk=getRisk(item.malicious,item.suspicious,item.total),color=t[risk.color]||t.muted;
-  return(
-    <div onClick={()=>onReload(item)} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:10,background:t.inputBg,border:`1px solid ${t.border}`,cursor:"pointer",transition:"border-color 0.2s"}}
-      onMouseEnter={e=>e.currentTarget.style.borderColor=color} onMouseLeave={e=>e.currentTarget.style.borderColor=t.border}>
-      <div style={{width:8,height:8,borderRadius:"50%",background:color,flexShrink:0,boxShadow:`0 0 5px ${color}88`}}/>
-      <div style={{flex:1,overflow:"hidden"}}>
-        <div style={{fontFamily:"Space Mono",fontSize:11,color:t.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{shortUrl(item.url)}</div>
-        <div style={{fontSize:9,color:t.muted,marginTop:1}}>{timeAgo(item.timestamp)} · {risk.label} · {item.malicious+item.suspicious}/{item.total}</div>
-      </div>
-      <span style={{fontSize:10,color,fontFamily:"Space Mono",flexShrink:0}}>{risk.label}</span>
-    </div>
-  );
-}
+
 
 // ── Tab Button ─────────────────────────────────────────────────────────
 function TabBtn({label,active,onClick,t,dark}){
@@ -197,20 +182,7 @@ function BulkRow({item,t}){
   );
 }
 
-// ── Feed Item (community) ──────────────────────────────────────────────
-function FeedItem({item,t}){
-  const risk=getRisk(item.malicious,item.suspicious,item.total),color=t[risk.color]||t.muted;
-  return(
-    <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:10,background:t.inputBg,border:`1px solid ${t.border}`}}>
-      <div style={{width:8,height:8,borderRadius:"50%",background:color,flexShrink:0}}/>
-      <div style={{flex:1,overflow:"hidden"}}>
-        <div style={{fontFamily:"Space Mono",fontSize:10,color:t.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{shortUrl(item.url)}</div>
-        <div style={{fontSize:9,color:t.muted,marginTop:1}}>{timeAgo(item.ts)} · {item.malicious+item.suspicious}/{item.total} flagged</div>
-      </div>
-      <span style={{fontSize:10,fontFamily:"Space Mono",color,flexShrink:0}}>{risk.label}</span>
-    </div>
-  );
-}
+
 
 // ═══════════════════════════════════════════════════════════════════════
 //  MAIN APP
@@ -218,59 +190,29 @@ function FeedItem({item,t}){
 export default function App(){
   const [dark,setDark]=useState(true);
   const t=dark?DARK:LIGHT;
-  const [apiKey,setApiKey]=useState(()=>{try{return sessionStorage.getItem("vt_key")||""}catch{return ""}});
   const [url,setUrl]=useState("");
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState(null);
   const [result,setResult]=useState(null);
   const [scannedUrl,setScannedUrl]=useState("");
   const [phase,setPhase]=useState(null);
-  const [tab,setTab]=useState("overview");
-  const [history,setHistory]=useState(()=>{try{return JSON.parse(sessionStorage.getItem("vt_history")||"[]")}catch{return []}});
+  const [tab,setTab]=useState("Overview");
   const [shareMsg,setShareMsg]=useState(null);
   const [copyMsg,setCopyMsg]=useState(null);
   const [bulkMode,setBulkMode]=useState(false);
   const [bulkText,setBulkText]=useState("");
   const [bulkResults,setBulkResults]=useState([]);
   const [bulkRunning,setBulkRunning]=useState(false);
-  const [communityFeed,setCommunityFeed]=useState([]);
-  const [feedLoading,setFeedLoading]=useState(false);
   const [dragOver,setDragOver]=useState(false);
   const pollRef=useRef(null);
-  const fileRef=useRef(null);
-
-  useEffect(()=>{try{if(apiKey)sessionStorage.setItem("vt_key",apiKey)}catch{}},[apiKey]);
-  useEffect(()=>{try{sessionStorage.setItem("vt_history",JSON.stringify(history))}catch{}},[history]);
-
-  // Load community feed from storage
-  const loadFeed=useCallback(async()=>{
-    setFeedLoading(true);
-    try{
-      const r=await window.storage.get("linkguard_feed",true);
-      if(r){const feed=JSON.parse(r.value);setCommunityFeed(feed.slice(0,30));}
-    }catch{}
-    setFeedLoading(false);
-  },[]);
-
-  useEffect(()=>{ if(tab==="community")loadFeed(); },[tab,loadFeed]);
-
-  const saveFeedEntry=async(entry)=>{
-    try{
-      const r=await window.storage.get("linkguard_feed",true);
-      const existing=r?JSON.parse(r.value):[];
-      const updated=[entry,...existing.filter(x=>x.url!==entry.url).slice(0,49)];
-      await window.storage.set("linkguard_feed",JSON.stringify(updated),true);
-    }catch{}
-  };
 
   // ── single scan ──────────────────────────────────────────────────────
-  const doScan=useCallback(async(su,sk,silent=false)=>{
-    if(!sk?.trim()){if(!silent)setError("Enter your VirusTotal API key.");return null;}
+  const doScan=useCallback(async(su,silent=false)=>{
     if(!su?.trim()){if(!silent)setError("Enter a URL to scan.");return null;}
-    if(!silent){setError(null);setResult(null);setLoading(true);setPhase("submitting");setScannedUrl(su.trim());setTab("overview");}
+    if(!silent){setError(null);setResult(null);setLoading(true);setPhase("submitting");setScannedUrl(su.trim());setTab("Overview");}
     try{
       const fd=new URLSearchParams();fd.append("url",su.trim());
-      const r=await fetch("https://www.virustotal.com/api/v3/urls",{method:"POST",headers:{"x-apikey":sk.trim(),"Content-Type":"application/x-www-form-urlencoded"},body:fd.toString()});
+      const r=await fetch("/api/urls",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:fd.toString()});
       if(!r.ok){const e=await r.json();throw new Error(e?.error?.message||`HTTP ${r.status}`);}
       const id=(await r.json()).data?.id;
       if(!id)throw new Error("No analysis ID.");
@@ -279,17 +221,12 @@ export default function App(){
       return await new Promise((resolve,reject)=>{
         const poll=async()=>{
           if(++attempts>24){reject(new Error("Timed out"));return;}
-          const pr=await fetch(`https://www.virustotal.com/api/v3/analyses/${id}`,{headers:{"x-apikey":sk.trim()}});
+          const pr=await fetch(`/api/analyses/${id}`);
           const pd=await pr.json();
           if(pd.data?.attributes?.status==="completed"){
             const attrs=pd.data.attributes;
             if(!silent){setResult(attrs);setPhase("done");setLoading(false);}
             const s=attrs?.stats||{},m=s.malicious||0,ss=s.suspicious||0,h=s.harmless||0,u=s.undetected||0,tot=m+ss+h+u+(s.timeout||0);
-            const entry={url:su.trim(),timestamp:Date.now(),malicious:m,suspicious:ss,harmless:h,undetected:u,total:tot,result:attrs};
-            if(!silent){
-              setHistory(prev=>[entry,...prev.filter(x=>x.url!==su.trim()).slice(0,19)]);
-              saveFeedEntry({url:su.trim(),ts:Date.now(),malicious:m,suspicious:ss,total:tot});
-            }
             resolve({malicious:m,suspicious:ss,harmless:h,undetected:u,total:tot,attrs});
           }else{pollRef.current=setTimeout(poll,3000);}
         };poll();
@@ -304,13 +241,12 @@ export default function App(){
   const runBulk=async()=>{
     const urls=bulkText.split(/\n|,/).map(x=>x.trim()).filter(x=>x.startsWith("http"));
     if(!urls.length){setError("No valid URLs found (must start with http).");return;}
-    if(!apiKey.trim()){setError("Enter your API key first.");return;}
     setError(null);setBulkResults(urls.map(u=>({url:u,status:"queued",result:null})));setBulkRunning(true);
     for(let i=0;i<urls.length;i++){
       setBulkResults(prev=>prev.map((x,j)=>j===i?{...x,status:"scanning"}:x));
-      await new Promise(res=>setTimeout(res,i>0?15500:0)); // respect 4/min rate limit
+      await new Promise(res=>setTimeout(res,i>0?15500:0));
       try{
-        const res=await doScan(urls[i],apiKey,true);
+        const res=await doScan(urls[i],true);
         setBulkResults(prev=>prev.map((x,j)=>j===i?{...x,status:"done",result:res}:x));
       }catch(e){
         setBulkResults(prev=>prev.map((x,j)=>j===i?{...x,status:"error",result:null}:x));
@@ -327,7 +263,7 @@ export default function App(){
   };
 
   // ── share / copy ─────────────────────────────────────────────────────
-  const handleShare=()=>{try{const d=btoa(JSON.stringify({u:scannedUrl,k:apiKey}));navigator.clipboard.writeText(`${window.location.href.split("#")[0]}#${d}`);setShareMsg("Copied!");setTimeout(()=>setShareMsg(null),2000);}catch{setShareMsg("Error");}};
+  const handleShare=()=>{try{const d=btoa(JSON.stringify({u:scannedUrl}));navigator.clipboard.writeText(`${window.location.href.split("#")[0]}#${d}`);setShareMsg("Copied!");setTimeout(()=>setShareMsg(null),2000);}catch{setShareMsg("Error");}};
   const handleCopy=()=>{if(!result)return;const s=result.stats||{},m=s.malicious||0,ss=s.suspicious||0,tot=m+ss+(s.harmless||0)+(s.undetected||0),risk=getRisk(m,ss,tot);navigator.clipboard.writeText(`🔍 LinkGuard Scan\n🔗 ${scannedUrl}\n⚠️ Risk: ${risk.label} (${risk.score}/100)\n🔴 Malicious: ${m}  🟡 Suspicious: ${ss}  ✅ Harmless: ${s.harmless||0}\n📊 ${tot} engines checked`);setCopyMsg("Copied!");setTimeout(()=>setCopyMsg(null),2000);};
 
   const reset=()=>{clearTimeout(pollRef.current);setResult(null);setError(null);setLoading(false);setPhase(null);setUrl("");setScannedUrl("");};
@@ -342,7 +278,7 @@ export default function App(){
   const redirects=result?.redirection_chain||[];
   const lastAnalysisDate=result?.date?new Date(result.date*1000).toLocaleString():null;
 
-  const TABS=result?["Overview","Intel","Charts","Engines","SSL","History","Community"]:["History","Community"];
+  const TABS=["Overview","Intel","Charts","Engines","SSL"];
 
   // ── render ───────────────────────────────────────────────────────────
   return(<>
@@ -378,14 +314,7 @@ export default function App(){
       {/* ── Main Card ──────────────────────────────────────────── */}
       <div style={{width:"100%",maxWidth:660,background:t.surface,border:`1px solid ${t.border}`,borderRadius:20,padding:"20px 16px",display:"flex",flexDirection:"column",gap:14,transition:"background 0.3s,border-color 0.3s"}}>
 
-        {/* API Key */}
-        <div>
-          <label style={{fontSize:9,fontFamily:"Space Mono",color:t.muted,letterSpacing:1.2,display:"block",marginBottom:6,textTransform:"uppercase"}}>API Key</label>
-          <input type="password" value={apiKey} onChange={e=>setApiKey(e.target.value)} placeholder="VirusTotal API key (saved for session)"
-            style={{width:"100%",padding:"11px 13px",borderRadius:10,background:t.inputBg,border:`1px solid ${t.border}`,color:t.green,fontFamily:"Space Mono",fontSize:12,outline:"none"}}
-            onFocus={e=>e.target.style.borderColor=t.green} onBlur={e=>e.target.style.borderColor=t.border}/>
-          <p style={{fontSize:9,color:t.muted,marginTop:4,fontFamily:"Space Mono"}}>Free at virustotal.com → Sign up → Profile → API Key</p>
-        </div>
+        {/* API Key section removed — key is stored in .env on the server */}
 
         {/* Single scan or bulk toggle */}
         {!bulkMode?(
@@ -393,11 +322,11 @@ export default function App(){
             <label style={{fontSize:9,fontFamily:"Space Mono",color:t.muted,letterSpacing:1.2,display:"block",marginBottom:6,textTransform:"uppercase"}}>URL to Scan</label>
             <div className={dragOver?"dropzone-active":""} onDragOver={e=>{e.preventDefault();setDragOver(true);}} onDragLeave={()=>setDragOver(false)} onDrop={onDrop}
               style={{display:"flex",gap:8,padding:dragOver?"8px":"0",borderRadius:12,border:`2px dashed ${dragOver?t.green:"transparent"}`,transition:"all 0.2s"}}>
-              <input type="url" value={url} onChange={e=>setUrl(e.target.value)} onKeyDown={e=>e.key==="Enter"&&!loading&&doScan(url,apiKey)}
+              <input type="url" value={url} onChange={e=>setUrl(e.target.value)} onKeyDown={e=>e.key==="Enter"&&!loading&&doScan(url)}
                 placeholder="https://example.com  (or drag & drop a link)"
                 style={{flex:1,padding:"11px 13px",borderRadius:10,background:t.inputBg,border:`1px solid ${t.border}`,color:t.text,fontFamily:"Space Mono",fontSize:12,outline:"none"}}
                 onFocus={e=>e.target.style.borderColor=t.green} onBlur={e=>e.target.style.borderColor=t.border}/>
-              <button onClick={result?reset:()=>doScan(url,apiKey)} disabled={loading}
+              <button onClick={result?reset:()=>doScan(url)} disabled={loading}
                 style={{padding:"11px 18px",borderRadius:10,border:"none",background:loading||result?t.border:t.green,color:loading||result?t.muted:dark?"#0a0a0f":"#fff",fontFamily:"Syne",fontWeight:700,fontSize:13,cursor:loading?"not-allowed":"pointer",whiteSpace:"nowrap",transition:"all 0.2s",flexShrink:0}}>
                 {loading?"…":result?"Reset":"Scan →"}
               </button>
@@ -443,7 +372,7 @@ export default function App(){
             {/* URL + action row */}
             <div style={{display:"flex",alignItems:"center",gap:6,padding:"9px 12px",borderRadius:10,background:t.inputBg,border:`1px solid ${t.border}`,flexWrap:"wrap"}}>
               <span style={{fontFamily:"Space Mono",fontSize:10,color:t.code,flex:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",minWidth:100}}>{scannedUrl}</span>
-              {[[copyMsg||"📋",handleCopy],[shareMsg||"🔗",handleShare],["🔁",()=>doScan(scannedUrl,apiKey)]].map(([lbl,fn],i)=>(
+              {[[copyMsg||"📋",handleCopy],[shareMsg||"🔗",handleShare],["🔁",()=>doScan(scannedUrl)]].map(([lbl,fn],i)=>(
                 <button key={i} onClick={fn} style={{fontSize:13,width:34,height:30,borderRadius:8,border:`1px solid ${t.border}`,background:t.surface,color:t.muted,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}
                   onMouseEnter={e=>e.currentTarget.style.borderColor=t.green} onMouseLeave={e=>e.currentTarget.style.borderColor=t.border}
                   title={["Copy results","Share link","Re-scan"][i]}>{lbl}</button>
@@ -563,57 +492,12 @@ export default function App(){
               </div>
             )}
 
-            {/* ── History tab ───────────────────────────────── */}
-            {tab==="History"&&(
-              <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <div style={{fontSize:9,fontFamily:"Space Mono",color:t.muted,letterSpacing:1,textTransform:"uppercase"}}>Session History ({history.length})</div>
-                  {history.length>0&&<button onClick={()=>setHistory([])} style={{fontSize:10,fontFamily:"Space Mono",color:t.red,background:"none",border:"none",cursor:"pointer"}}>Clear</button>}
-                </div>
-                {history.length===0?<div style={{fontSize:11,fontFamily:"Space Mono",color:t.muted,padding:14,textAlign:"center"}}>No scans yet</div>
-                  :history.map((item,i)=><HistoryItem key={i} item={item} onReload={item=>{setUrl(item.url);setResult(item.result);setScannedUrl(item.url);setTab("Overview");}} t={t}/>)}
-              </div>
-            )}
 
-            {/* ── Community tab ─────────────────────────────── */}
-            {tab==="Community"&&(
-              <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <div style={{fontSize:9,fontFamily:"Space Mono",color:t.muted,letterSpacing:1,textTransform:"uppercase"}}>🌍 Community Scan Feed</div>
-                  <button onClick={loadFeed} style={{fontSize:10,fontFamily:"Space Mono",color:t.blue,background:"none",border:"none",cursor:"pointer"}}>Refresh</button>
-                </div>
-                <p style={{fontSize:9,color:t.muted,fontFamily:"Space Mono"}}>URLs scanned by all LinkGuard users (shared publicly)</p>
-                {feedLoading?<div style={{textAlign:"center",padding:14,fontFamily:"Space Mono",fontSize:11,color:t.muted}}>Loading…</div>
-                  :communityFeed.length===0?<div style={{textAlign:"center",padding:14,fontFamily:"Space Mono",fontSize:11,color:t.muted}}>No community scans yet. Be the first!</div>
-                  :communityFeed.map((item,i)=><FeedItem key={i} item={item} t={t}/>)}
-              </div>
-            )}
 
           </div>
         )}
 
-        {/* ── No result yet: show History + Community preview ── */}
-        {!result&&!loading&&(
-          <div style={{display:"flex",flexDirection:"column",gap:12}}>
-            <div style={{display:"flex",gap:3,background:t.inputBg,borderRadius:12,padding:3,border:`1px solid ${t.border}`}}>
-              {TABS.map(id=><TabBtn key={id} label={id} active={tab===id} onClick={()=>{setTab(id);if(id==="Community")loadFeed();}} t={t} dark={dark}/>)}
-            </div>
-            {tab==="History"&&(
-              <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                {history.length===0?<div style={{fontSize:11,fontFamily:"Space Mono",color:t.muted,padding:14,textAlign:"center"}}>No scans yet</div>
-                  :history.map((item,i)=><HistoryItem key={i} item={item} onReload={item=>{setUrl(item.url);setResult(item.result);setScannedUrl(item.url);}} t={t}/>)}
-              </div>
-            )}
-            {tab==="Community"&&(
-              <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                <p style={{fontSize:9,color:t.muted,fontFamily:"Space Mono"}}>🌍 URLs scanned by all LinkGuard users (public)</p>
-                {feedLoading?<div style={{textAlign:"center",padding:14,fontFamily:"Space Mono",fontSize:11,color:t.muted}}>Loading…</div>
-                  :communityFeed.length===0?<div style={{textAlign:"center",padding:14,fontFamily:"Space Mono",fontSize:11,color:t.muted}}>No community scans yet. Be the first!</div>
-                  :communityFeed.map((item,i)=><FeedItem key={i} item={item} t={t}/>)}
-              </div>
-            )}
-          </div>
-        )}
+
 
       </div>
       <p style={{marginTop:16,fontSize:9,fontFamily:"Space Mono",color:t.muted,textAlign:"center"}}>Free tier: 500 req/day · 4 req/min · Non-commercial use</p>
