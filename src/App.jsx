@@ -593,7 +593,7 @@ export default function App(){
           onMouseEnter={e=>{e.currentTarget.style.borderColor=t.green;e.currentTarget.style.background=`${t.green}12`;}}
           onMouseLeave={e=>{e.currentTarget.style.borderColor=`${t.green}44`;e.currentTarget.style.background=`${t.green}08`;}}>
           <span style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:800,fontSize:13,color:t.green,letterSpacing:0.3}}>✦ Acentra Tech</span>
-          <span style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:11,color:t.muted,textAlign:"center"}}>Explore the team behind LinkGuard — visit our company website!</span>
+          <span style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:11,color:t.muted,textAlign:"center"}}>This is just a grain of what we do — curious to discover more?</span>
           <span style={{fontFamily:"JetBrains Mono",fontSize:9,color:`${t.green}99`,marginTop:2}}>acentratech.web.app →</span>
         </a>
         <p style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,textAlign:"center"}}>500 scans/day · 4/min · Non-commercial use</p>
