@@ -249,7 +249,7 @@ export default function App(){
       if(!r.ok){
         let msg=`HTTP ${r.status}`;
         try{const e=await r.json();msg=e?.error?.message||msg;}catch{}
-        if(r.status===429)msg="Daily quota reached — VirusTotal free tier allows 500 requests/day. Try again tomorrow.";
+        if(r.status===429)msg="Scan limit reached — our analysis engine allows a limited number of requests per day. Please try again later.";
         throw new Error(msg);
       }
       let submitData;try{submitData=await r.json();}catch{throw new Error("Invalid response from server.");}
@@ -746,7 +746,7 @@ export default function App(){
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={t.yellow} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0,marginTop:1}}>
                 <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
               </svg>
-              <p style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:11,color:t.muted,lineHeight:1.65}}>Uses the <strong style={{color:t.text}}>VirusTotal free tier</strong> — 500 scans/day, 4/min. Results are cached; hit Re-scan if data looks stale.</p>
+              <p style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:11,color:t.muted,lineHeight:1.65}}>Powered by a <strong style={{color:t.text}}>multi-engine threat intelligence network</strong> with daily scan limits. Results are cached; hit Re-scan if data looks stale.</p>
             </div>
           </div>
         )}
@@ -781,7 +781,7 @@ export default function App(){
             </a>
           ))}
         </div>
-        <p style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,textAlign:"center",opacity:0.7}}>500 scans/day · 4/min · Non-commercial use</p>
+        <p style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,textAlign:"center",opacity:0.7}}>Daily scan limits apply · Non-commercial use</p>
       </div>
     </div>
   </>);
