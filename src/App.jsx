@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from "react";
 
 const DARK={bg:"#0a0a0f",surface:"#111118",border:"#1e1e2e",text:"#e8e6f0",muted:"#5a5a7a",code:"#a0a0c8",green:"#00ff9d",red:"#ff3c5c",yellow:"#ffe566",blue:"#5b8cff",inputBg:"#0d0d14",cardBg:"#13131f"};
 const LIGHT={bg:"#f0f0f5",surface:"#ffffff",border:"#e0dfe8",text:"#1a1a2e",muted:"#8888aa",code:"#444466",green:"#00a86b",red:"#e8294a",yellow:"#c47d00",blue:"#2f5fd4",inputBg:"#f8f8fc",cardBg:"#f4f4fa"};
-const FONTS=`@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap');`;
+const FONTS=`@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');`;
 
 function getRisk(m,s,tot){
   if(!tot)return{score:0,label:"Unknown",color:null};
@@ -37,7 +37,7 @@ function RadarChart({mal,sus,har,und,t}){
       {pts.map(([x,y],i)=><circle key={i} cx={x} cy={y} r="4" fill={colors[i]}/>)}
       {labelPos.map(([x,y],i)=>(
         <text key={i} x={x} y={y} textAnchor="middle" dominantBaseline="middle" fill={colors[i]}
-          style={{fontFamily:"Space Mono",fontSize:8,fontWeight:700}}>{labels[i]}</text>
+          style={{fontFamily:"JetBrains Mono",fontSize:8,fontWeight:700}}>{labels[i]}</text>
       ))}
     </svg>
   );
@@ -59,8 +59,8 @@ function DonutChart({mal,sus,har,und,t}){
           strokeDasharray={`${dash} ${space}`} strokeDashoffset={-rot+circ/4}
           style={{transition:"stroke-dasharray 0.6s"}}/>;
       })}
-      <text x={cx} y={cy-5} textAnchor="middle" fill={t.text} style={{fontFamily:"Space Mono",fontSize:11,fontWeight:700}}>{tot}</text>
-      <text x={cx} y={cy+8} textAnchor="middle" fill={t.muted} style={{fontFamily:"Space Mono",fontSize:7}}>engines</text>
+      <text x={cx} y={cy-5} textAnchor="middle" fill={t.text} style={{fontFamily:"JetBrains Mono",fontSize:11,fontWeight:700}}>{tot}</text>
+      <text x={cx} y={cy+8} textAnchor="middle" fill={t.muted} style={{fontFamily:"JetBrains Mono",fontSize:7}}>engines</text>
     </svg>
   );
 }
@@ -77,9 +77,9 @@ function RiskGauge({score,label,colorKey,t}){
         <line x1="60" y1="70" x2="60" y2="28" stroke={color} strokeWidth="3" strokeLinecap="round"
           style={{transformOrigin:"60px 70px",transform:`rotate(${angle}deg)`,transition:"transform 0.9s"}}/>
         <circle cx="60" cy="70" r="5" fill={color}/>
-        <text x="60" y="60" textAnchor="middle" fill={t.text} style={{fontFamily:"Space Mono",fontSize:15,fontWeight:700}}>{score}</text>
+        <text x="60" y="60" textAnchor="middle" fill={t.text} style={{fontFamily:"JetBrains Mono",fontSize:15,fontWeight:700}}>{score}</text>
       </svg>
-      <span style={{fontFamily:"Space Mono",fontSize:10,fontWeight:700,color,letterSpacing:1}}>{label.toUpperCase()}</span>
+      <span style={{fontFamily:"JetBrains Mono",fontSize:10,fontWeight:700,color,letterSpacing:1}}>{label.toUpperCase()}</span>
     </div>
   );
 }
@@ -97,7 +97,7 @@ function ThreatBar({mal,sus,har,und,t}){
         {segs.map((s,i)=>(
           <div key={i} style={{display:"flex",alignItems:"center",gap:4}}>
             <div style={{width:7,height:7,borderRadius:2,background:s.c}}/>
-            <span style={{fontSize:10,fontFamily:"Space Mono",color:t.muted}}>{s.l} <span style={{color:t.text}}>{s.v}</span><span style={{opacity:0.5}}> {Math.round(s.v/tot*100)}%</span></span>
+            <span style={{fontSize:10,fontFamily:"JetBrains Mono",color:t.muted}}>{s.l} <span style={{color:t.text}}>{s.v}</span><span style={{opacity:0.5}}> {Math.round(s.v/tot*100)}%</span></span>
           </div>
         ))}
       </div>
@@ -114,7 +114,7 @@ function CategoryTags({categories,t}){
     <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
       {unique.map((cat,i)=>{
         const isBad=bad.some(b=>cat.toLowerCase().includes(b));
-        return<span key={i} style={{padding:"2px 9px",borderRadius:99,fontSize:10,fontFamily:"Space Mono",fontWeight:700,background:isBad?`${t.red}18`:`${t.green}18`,color:isBad?t.red:t.green,border:`1px solid ${isBad?t.red:t.green}33`,textTransform:"uppercase",letterSpacing:0.5}}>{cat}</span>;
+        return<span key={i} style={{padding:"2px 9px",borderRadius:99,fontSize:10,fontFamily:"JetBrains Mono",fontWeight:700,background:isBad?`${t.red}18`:`${t.green}18`,color:isBad?t.red:t.green,border:`1px solid ${isBad?t.red:t.green}33`,textTransform:"uppercase",letterSpacing:0.5}}>{cat}</span>;
       })}
     </div>
   );
@@ -129,12 +129,12 @@ function SSLCard({ssl,t}){
     <div style={{display:"flex",flexDirection:"column",gap:6,padding:"12px 14px",borderRadius:12,background:t.inputBg,border:`1px solid ${valid===false?t.red:t.border}`}}>
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:2}}>
         <span>{valid===false?"🔓":"🔒"}</span>
-        <span style={{fontFamily:"Space Mono",fontSize:11,fontWeight:700,color:valid===false?t.red:t.green}}>{valid===false?"EXPIRED SSL":valid?"VALID SSL":"SSL INFO"}</span>
+        <span style={{fontFamily:"JetBrains Mono",fontSize:11,fontWeight:700,color:valid===false?t.red:t.green}}>{valid===false?"EXPIRED SSL":valid?"VALID SSL":"SSL INFO"}</span>
       </div>
       {[["Issuer",ssl.cert_issuer],["Subject",ssl.cert_subject],["Expires",exp],["Serial",ssl.cert_serial_number]].filter(([,v])=>v&&v!=="N/A").map(([k,v])=>(
         <div key={k} style={{display:"flex",gap:8,alignItems:"flex-start"}}>
-          <span style={{fontFamily:"Space Mono",fontSize:9,color:t.muted,minWidth:52,textTransform:"uppercase",letterSpacing:0.5,paddingTop:1}}>{k}</span>
-          <span style={{fontFamily:"Space Mono",fontSize:10,color:t.code,wordBreak:"break-all"}}>{v}</span>
+          <span style={{fontFamily:"JetBrains Mono",fontSize:9,color:t.muted,minWidth:52,textTransform:"uppercase",letterSpacing:0.5,paddingTop:1}}>{k}</span>
+          <span style={{fontFamily:"JetBrains Mono",fontSize:10,color:t.code,wordBreak:"break-all"}}>{v}</span>
         </div>
       ))}
     </div>
@@ -146,8 +146,8 @@ function InfoRow({icon,label,value,color,t,mono=true}){
     <div style={{display:"flex",alignItems:"flex-start",gap:10,padding:"9px 12px",borderRadius:10,background:t.inputBg,border:`1px solid ${t.border}`}}>
       <span style={{fontSize:14,flexShrink:0}}>{icon}</span>
       <div style={{flex:1,minWidth:0}}>
-        <div style={{fontSize:9,fontFamily:"Space Mono",color:t.muted,textTransform:"uppercase",letterSpacing:0.8,marginBottom:2}}>{label}</div>
-        <div style={{fontSize:11,fontFamily:mono?"Space Mono":"Syne",color:color||t.text,wordBreak:"break-all"}}>{value||"—"}</div>
+        <div style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,textTransform:"uppercase",letterSpacing:0.8,marginBottom:2}}>{label}</div>
+        <div style={{fontSize:11,fontFamily:mono?"JetBrains Mono":"Plus Jakarta Sans",color:color||t.text,wordBreak:"break-all"}}>{value||"—"}</div>
       </div>
     </div>
   );
@@ -163,10 +163,10 @@ function BulkRow({item,t}){
     <div style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",borderRadius:10,background:t.inputBg,border:`1px solid ${color}44`}}>
       <div style={{width:8,height:8,borderRadius:"50%",background:color,flexShrink:0,boxShadow:item.result?`0 0 5px ${color}66`:"none"}}/>
       <div style={{flex:1,overflow:"hidden"}}>
-        <div style={{fontFamily:"Space Mono",fontSize:10,color:t.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{shortUrl(item.url)}</div>
+        <div style={{fontFamily:"JetBrains Mono",fontSize:10,color:t.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{shortUrl(item.url)}</div>
         {item.result&&<div style={{fontSize:9,color:t.muted,marginTop:1}}>{item.result.malicious+item.result.suspicious}/{item.result.total} engines flagged</div>}
       </div>
-      <span style={{fontSize:10,fontFamily:"Space Mono",color,flexShrink:0,textAlign:"right"}}>{risk.label}</span>
+      <span style={{fontSize:10,fontFamily:"JetBrains Mono",color,flexShrink:0,textAlign:"right"}}>{risk.label}</span>
     </div>
   );
 }
@@ -194,6 +194,8 @@ export default function App(){
   const [bulkRunning,setBulkRunning]=useState(false);
   const [dragOver,setDragOver]=useState(false);
   const pollRef=useRef(null);
+  const bulkCancelRef=useRef(false);
+  const touchStartX=useRef(null);
 
   // ── single scan ──────────────────────────────────────────────────────
   const doScan=useCallback(async(su,silent=false)=>{
@@ -221,7 +223,7 @@ export default function App(){
           let pd;try{pd=await pr.json();}catch{pollRef.current=setTimeout(poll,3000);return;}
           if(pd.data?.attributes?.status==="completed"){
             const attrs=pd.data.attributes;
-            if(!silent){setResult(attrs);setPhase("done");setLoading(false);}
+            if(!silent){setResult(attrs);setPhase("done");setLoading(false);navigator.vibrate?.(100);}
             const s=attrs?.stats||{},m=s.malicious||0,ss=s.suspicious||0,h=s.harmless||0,u=s.undetected||0,tot=m+ss+h+u+(s.timeout||0);
             resolve({malicious:m,suspicious:ss,harmless:h,undetected:u,total:tot,attrs});
           }else{pollRef.current=setTimeout(poll,3000);}
@@ -237,10 +239,13 @@ export default function App(){
   const runBulk=async()=>{
     const urls=bulkText.split(/\n|,/).map(x=>x.trim()).filter(x=>x.startsWith("http"));
     if(!urls.length){setError("No valid URLs found (must start with http).");return;}
+    bulkCancelRef.current=false;
     setError(null);setBulkResults(urls.map(u=>({url:u,status:"queued",result:null})));setBulkRunning(true);
     for(let i=0;i<urls.length;i++){
+      if(bulkCancelRef.current)break;
       setBulkResults(prev=>prev.map((x,j)=>j===i?{...x,status:"scanning"}:x));
-      await new Promise(res=>setTimeout(res,i>0?15500:0));
+      if(i>0){await new Promise(res=>{let e=0;const tk=setInterval(()=>{e+=300;if(e>=15500||bulkCancelRef.current){clearInterval(tk);res();}},300);});}
+      if(bulkCancelRef.current)break;
       try{
         const res=await doScan(urls[i],true);
         setBulkResults(prev=>prev.map((x,j)=>j===i?{...x,status:"done",result:res}:x));
@@ -281,7 +286,7 @@ export default function App(){
     <style>{FONTS+`
       *{box-sizing:border-box;margin:0;padding:0;}
       html{height:-webkit-fill-available;}
-      body{background:${t.bg};color:${t.text};font-family:'Syne',sans-serif;transition:background 0.3s,color 0.3s;-webkit-tap-highlight-color:transparent;min-height:100vh;min-height:-webkit-fill-available;overscroll-behavior:none;}
+      body{background:${t.bg};color:${t.text};font-family:'Plus Jakarta Sans',sans-serif;transition:background 0.3s,color 0.3s;-webkit-tap-highlight-color:transparent;min-height:100vh;min-height:-webkit-fill-available;overscroll-behavior:none;}
       button,a{touch-action:manipulation;}
       details summary{list-style:none;cursor:pointer;}
       details summary::-webkit-details-marker{display:none;}
@@ -295,11 +300,11 @@ export default function App(){
       .dropzone-active{border-color:${t.green}!important;background:${t.green}0a!important;}
       .card{width:100%;background:${t.surface};border:1px solid ${t.border};border-radius:clamp(14px,3vw,22px);padding:clamp(14px,4vw,24px);display:flex;flex-direction:column;gap:clamp(10px,3vw,16px);transition:background 0.3s,border-color 0.3s;}
       .scan-row{display:flex;gap:clamp(6px,2vw,10px);}
-      .url-input{flex:1;min-width:0;padding:clamp(11px,2.5vw,14px) clamp(12px,3vw,16px);border-radius:10px;font-family:'Space Mono',monospace;font-size:16px;outline:none;width:100%;}
-      .scan-btn{flex-shrink:0;padding:clamp(11px,2.5vw,14px) clamp(16px,4vw,22px);border-radius:10px;border:none;font-family:'Syne',sans-serif;font-weight:700;font-size:clamp(13px,3.5vw,14px);cursor:pointer;white-space:nowrap;transition:all 0.2s;min-height:44px;}
+      .url-input{flex:1;min-width:0;padding:clamp(11px,2.5vw,14px) clamp(12px,3vw,16px);border-radius:10px;font-family:'JetBrains Mono',monospace;font-size:16px;outline:none;width:100%;}
+      .scan-btn{flex-shrink:0;padding:clamp(11px,2.5vw,14px) clamp(16px,4vw,22px);border-radius:10px;border:none;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:clamp(13px,3.5vw,14px);cursor:pointer;white-space:nowrap;transition:all 0.2s;min-height:44px;}
       .tab-bar{display:flex;gap:3px;border-radius:12px;padding:3px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
       .tab-bar::-webkit-scrollbar{display:none;}
-      .tab-btn{flex:1;min-width:fit-content;padding:clamp(7px,2vw,9px) clamp(6px,2vw,10px);border-radius:9px;border:none;cursor:pointer;font-family:'Syne',sans-serif;font-weight:700;font-size:clamp(11px,3vw,13px);transition:all 0.2s;white-space:nowrap;}
+      .tab-btn{flex:1;min-width:fit-content;padding:clamp(7px,2vw,9px) clamp(6px,2vw,10px);border-radius:9px;border:none;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:clamp(11px,3vw,13px);transition:all 0.2s;white-space:nowrap;}
       .action-btn{font-size:clamp(13px,3.5vw,15px);width:clamp(34px,9vw,38px);height:clamp(34px,9vw,38px);border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:border-color 0.2s;}
       .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(6px,2vw,10px);}
       @media(max-width:420px){
@@ -323,7 +328,7 @@ export default function App(){
           <p style={{color:t.muted,fontSize:"clamp(10px,2.5vw,12px)",marginTop:2}}>70+ security engines · Instant scan</p>
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
-          <button onClick={()=>{setBulkMode(b=>!b);setError(null);}} style={{padding:"9px 14px",borderRadius:10,border:`1px solid ${bulkMode?t.green:t.border}`,background:bulkMode?`${t.green}18`:t.surface,color:bulkMode?t.green:t.muted,fontFamily:"Syne",fontWeight:700,fontSize:13,cursor:"pointer",minHeight:38}}>Bulk</button>
+          <button onClick={()=>{setBulkMode(b=>!b);setError(null);}} style={{padding:"9px 14px",borderRadius:10,border:`1px solid ${bulkMode?t.green:t.border}`,background:bulkMode?`${t.green}18`:t.surface,color:bulkMode?t.green:t.muted,fontFamily:"Plus Jakarta Sans",fontWeight:700,fontSize:13,cursor:"pointer",minHeight:38}}>Bulk</button>
           <button onClick={()=>setDark(d=>!d)} style={{width:38,height:38,borderRadius:10,border:`1px solid ${t.border}`,background:t.surface,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} title={dark?"Switch to light mode":"Switch to dark mode"}>
             {dark?(
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -349,10 +354,10 @@ export default function App(){
         {/* Single scan or bulk toggle */}
         {!bulkMode?(
           <div>
-            <label style={{fontSize:9,fontFamily:"Space Mono",color:t.muted,letterSpacing:1.2,display:"block",marginBottom:6,textTransform:"uppercase"}}>URL to Scan</label>
+            <label style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,letterSpacing:1.2,display:"block",marginBottom:6,textTransform:"uppercase"}}>URL to Scan</label>
             <div className={`scan-row${dragOver?" dropzone-active":""}`} onDragOver={e=>{e.preventDefault();setDragOver(true);}} onDragLeave={()=>setDragOver(false)} onDrop={onDrop}
               style={{padding:dragOver?"8px":"0",borderRadius:12,border:`2px dashed ${dragOver?t.green:"transparent"}`,transition:"all 0.2s"}}>
-              <input type="url" value={url} onChange={e=>setUrl(e.target.value)} onKeyDown={e=>e.key==="Enter"&&!loading&&doScan(url)}
+              <input type="url" inputMode="url" value={url} onChange={e=>setUrl(e.target.value)} onKeyDown={e=>e.key==="Enter"&&!loading&&doScan(url)}
                 placeholder="https://example.com"
                 className="url-input"
                 style={{background:t.inputBg,border:`1px solid ${t.border}`,color:t.text}}
@@ -366,15 +371,21 @@ export default function App(){
           </div>
         ):(
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            <label style={{fontSize:9,fontFamily:"Space Mono",color:t.muted,letterSpacing:1.2,textTransform:"uppercase"}}>Bulk Scan — one URL per line</label>
+            <label style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,letterSpacing:1.2,textTransform:"uppercase"}}>Bulk Scan — one URL per line</label>
             <textarea value={bulkText} onChange={e=>setBulkText(e.target.value)} placeholder={"https://example.com\nhttps://another-url.com\nhttps://third-url.com"}
-              rows={4} style={{width:"100%",padding:"11px 13px",borderRadius:10,background:t.inputBg,border:`1px solid ${t.border}`,color:t.text,fontFamily:"Space Mono",fontSize:11,outline:"none",resize:"vertical"}}
+              rows={4} style={{width:"100%",padding:"11px 13px",borderRadius:10,background:t.inputBg,border:`1px solid ${t.border}`,color:t.text,fontFamily:"JetBrains Mono",fontSize:11,outline:"none",resize:"vertical"}}
               onFocus={e=>e.target.style.borderColor=t.green} onBlur={e=>e.target.style.borderColor=t.border}/>
-            <button onClick={runBulk} disabled={bulkRunning}
-              style={{padding:"11px 18px",borderRadius:10,border:"none",background:bulkRunning?t.border:t.green,color:bulkRunning?t.muted:dark?"#0a0a0f":"#fff",fontFamily:"Syne",fontWeight:700,fontSize:13,cursor:bulkRunning?"not-allowed":"pointer",transition:"all 0.2s"}}>
-              {bulkRunning?"Scanning… (rate limited)":"Scan All →"}
-            </button>
-            {bulkRunning&&<p style={{fontSize:9,color:t.muted,fontFamily:"Space Mono",textAlign:"center"}}>⏱ 15s delay between scans (free tier rate limit)</p>}
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={runBulk} disabled={bulkRunning}
+                style={{flex:1,padding:"11px 18px",borderRadius:10,border:"none",background:bulkRunning?t.border:t.green,color:bulkRunning?t.muted:dark?"#0a0a0f":"#fff",fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:700,fontSize:13,cursor:bulkRunning?"not-allowed":"pointer",transition:"all 0.2s"}}>
+                {bulkRunning?"Scanning… (rate limited)":"Scan All →"}
+              </button>
+              {bulkRunning&&<button onClick={()=>{bulkCancelRef.current=true;}}
+                style={{padding:"11px 18px",borderRadius:10,border:`1px solid ${t.red}`,background:`${t.red}11`,color:t.red,fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:700,fontSize:13,cursor:"pointer",transition:"all 0.2s",flexShrink:0}}>
+                Stop
+              </button>}
+            </div>
+            {bulkRunning&&<p style={{fontSize:9,color:t.muted,fontFamily:"JetBrains Mono",textAlign:"center"}}>⏱ 15s delay between scans · tap Stop to cancel</p>}
             {bulkResults.length>0&&(
               <div style={{display:"flex",flexDirection:"column",gap:6}}>
                 {bulkResults.map((item,i)=><BulkRow key={i} item={item} t={t}/>)}
@@ -386,7 +397,7 @@ export default function App(){
         {/* Loading */}
         {loading&&(
           <div style={{padding:16,borderRadius:12,background:t.inputBg,border:`1px solid ${t.border}`,textAlign:"center"}}>
-            <div style={{fontSize:12,fontFamily:"Space Mono",color:t.green,marginBottom:8}}>{phase==="submitting"?"⟳  Submitting…":"⟳  Engines analyzing… (15–30s)"}</div>
+            <div style={{fontSize:12,fontFamily:"JetBrains Mono",color:t.green,marginBottom:8}}>{phase==="submitting"?"⟳  Submitting…":"⟳  Engines analyzing… (15–30s)"}</div>
             <div style={{height:3,borderRadius:99,background:t.border,overflow:"hidden",margin:"0 auto",maxWidth:220}}>
               <div style={{height:"100%",background:t.green,width:"40%",borderRadius:99,animation:"slide 1.4s ease-in-out infinite"}}/>
             </div>
@@ -394,15 +405,25 @@ export default function App(){
         )}
 
         {/* Error */}
-        {error&&<div style={{padding:12,borderRadius:10,background:`${t.red}0d`,border:`1px solid ${t.red}33`,color:t.red,fontFamily:"Space Mono",fontSize:11}}>✕ {error}</div>}
+        {error&&<div style={{padding:12,borderRadius:10,background:`${t.red}0d`,border:`1px solid ${t.red}33`,color:t.red,fontFamily:"JetBrains Mono",fontSize:11}}>✕ {error}</div>}
 
         {/* Results */}
         {result&&(
-          <div className="fadein" style={{display:"flex",flexDirection:"column",gap:12}}>
+          <div className="fadein" style={{display:"flex",flexDirection:"column",gap:12}}
+            onTouchStart={e=>{touchStartX.current=e.touches[0].clientX;}}
+            onTouchEnd={e=>{
+              if(touchStartX.current===null)return;
+              const delta=e.changedTouches[0].clientX-touchStartX.current;
+              touchStartX.current=null;
+              if(Math.abs(delta)<50)return;
+              const idx=TABS.indexOf(tab);
+              if(delta<0&&idx<TABS.length-1)setTab(TABS[idx+1]);
+              if(delta>0&&idx>0)setTab(TABS[idx-1]);
+            }}>
 
             {/* URL + action row */}
             <div style={{display:"flex",gap:"clamp(4px,2vw,8px)",alignItems:"center",padding:"clamp(8px,2vw,10px) clamp(10px,2.5vw,13px)",borderRadius:10,background:t.inputBg,border:`1px solid ${t.border}`,flexWrap:"wrap"}}>
-              <span style={{fontFamily:"Space Mono",fontSize:"clamp(9px,2.5vw,11px)",color:t.code,flex:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",minWidth:80}}>{scannedUrl}</span>
+              <span style={{fontFamily:"JetBrains Mono",fontSize:"clamp(9px,2.5vw,11px)",color:t.code,flex:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",minWidth:80}}>{scannedUrl}</span>
               {[[copyMsg||"📋",handleCopy],[shareMsg||"🔗",handleShare],["🔁",()=>doScan(scannedUrl)]].map(([lbl,fn],i)=>(
                 <button key={i} onClick={fn}
                   className="action-btn"
@@ -425,7 +446,7 @@ export default function App(){
                   <RiskGauge score={risk.score} label={risk.label} colorKey={risk.color} t={t}/>
                   <div style={{flex:1,minWidth:160}}>
                     <div style={{fontSize:17,fontWeight:800,color:rc,letterSpacing:-0.5}}>{mal===0&&sus===0?"✓ No threats detected":`⚠ ${mal+sus} engine${mal+sus>1?"s":""} flagged`}</div>
-                    <div style={{fontSize:11,color:t.muted,marginTop:5,fontFamily:"Space Mono"}}>{tot} engines · {lastAnalysisDate||"just now"}</div>
+                    <div style={{fontSize:11,color:t.muted,marginTop:5,fontFamily:"JetBrains Mono"}}>{tot} engines · {lastAnalysisDate||"just now"}</div>
                     {result.categories&&Object.keys(result.categories).length>0&&<div style={{marginTop:8}}><CategoryTags categories={result.categories} t={t}/></div>}
                   </div>
                 </div>
@@ -443,11 +464,11 @@ export default function App(){
                 {result.last_http_response_content_length&&<InfoRow icon="📦" label="Response Size" value={`${(result.last_http_response_content_length/1024).toFixed(1)} KB`} t={t}/>}
                 {redirects.length>0&&(
                   <div style={{padding:"12px 14px",borderRadius:12,background:t.inputBg,border:`1px solid ${t.yellow}44`}}>
-                    <div style={{fontSize:9,fontFamily:"Space Mono",color:t.muted,letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>🔀 Redirect Chain ({redirects.length} hops)</div>
+                    <div style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>🔀 Redirect Chain ({redirects.length} hops)</div>
                     {redirects.map((r,i)=>(
                       <div key={i} style={{display:"flex",gap:8,alignItems:"flex-start",marginBottom:i<redirects.length-1?6:0}}>
-                        <span style={{fontFamily:"Space Mono",fontSize:9,color:t.muted,flexShrink:0,paddingTop:1}}>#{i+1}</span>
-                        <span style={{fontFamily:"Space Mono",fontSize:10,color:i===redirects.length-1?t.green:t.yellow,wordBreak:"break-all"}}>{r}</span>
+                        <span style={{fontFamily:"JetBrains Mono",fontSize:9,color:t.muted,flexShrink:0,paddingTop:1}}>#{i+1}</span>
+                        <span style={{fontFamily:"JetBrains Mono",fontSize:10,color:i===redirects.length-1?t.green:t.yellow,wordBreak:"break-all"}}>{r}</span>
                       </div>
                     ))}
                   </div>
@@ -462,11 +483,11 @@ export default function App(){
               <div style={{display:"flex",flexDirection:"column",gap:12}}>
                 <div style={{display:"flex",gap:12,alignItems:"center",justifyContent:"center",padding:16,borderRadius:14,background:t.inputBg,border:`1px solid ${t.border}`,flexWrap:"wrap"}}>
                   <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
-                    <span style={{fontSize:9,fontFamily:"Space Mono",color:t.muted,letterSpacing:1,textTransform:"uppercase"}}>Distribution</span>
+                    <span style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,letterSpacing:1,textTransform:"uppercase"}}>Distribution</span>
                     <DonutChart mal={mal} sus={sus} har={har} und={und} t={t}/>
                   </div>
                   <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
-                    <span style={{fontSize:9,fontFamily:"Space Mono",color:t.muted,letterSpacing:1,textTransform:"uppercase"}}>Profile</span>
+                    <span style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,letterSpacing:1,textTransform:"uppercase"}}>Profile</span>
                     <RadarChart mal={mal} sus={sus} har={har} und={und} t={t}/>
                   </div>
                 </div>
@@ -474,8 +495,8 @@ export default function App(){
                 <div className="info-grid">
                   {[["🔴 Malicious",mal,t.red],["🟡 Suspicious",sus,t.yellow],["✅ Harmless",har,t.green],["⚪ Undetected",und,t.muted]].map(([lbl,val,color],i)=>(
                     <div key={i} style={{padding:"clamp(10px,3vw,14px)",borderRadius:12,background:t.inputBg,border:`1px solid ${color}33`,display:"flex",flexDirection:"column",gap:4}}>
-                      <span style={{fontSize:"clamp(18px,5vw,24px)",fontWeight:800,fontFamily:"Space Mono",color}}>{val}</span>
-                      <span style={{fontSize:10,color:t.muted,fontFamily:"Space Mono"}}>{lbl}</span>
+                      <span style={{fontSize:"clamp(18px,5vw,24px)",fontWeight:800,fontFamily:"JetBrains Mono",color}}>{val}</span>
+                      <span style={{fontSize:10,color:t.muted,fontFamily:"JetBrains Mono"}}>{lbl}</span>
                       <div style={{height:3,borderRadius:99,background:t.border,marginTop:4}}>
                         <div style={{height:"100%",background:color,borderRadius:99,width:`${tot?Math.round(val/tot*100):0}%`,transition:"width 0.6s"}}/>
                       </div>
@@ -490,26 +511,26 @@ export default function App(){
               <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 {flagged.length>0&&(
                   <div>
-                    <div style={{fontSize:9,fontFamily:"Space Mono",color:t.muted,letterSpacing:1,marginBottom:6,textTransform:"uppercase"}}>Flagged ({flagged.length})</div>
+                    <div style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,letterSpacing:1,marginBottom:6,textTransform:"uppercase"}}>Flagged ({flagged.length})</div>
                     <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:260,overflowY:"auto"}}>
                       {flagged.map(([name,data])=>(
                         <div key={name} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 11px",borderRadius:9,background:data.category==="malicious"?`${t.red}0a`:`${t.yellow}0a`,border:`1px solid ${data.category==="malicious"?t.red:t.yellow}33`}}>
-                          <span style={{fontFamily:"Space Mono",fontSize:11,color:t.muted}}>{name}</span>
-                          <span style={{fontSize:10,fontFamily:"Space Mono",color:data.category==="malicious"?t.red:t.yellow,textAlign:"right",marginLeft:8}}>{data.result||data.category}</span>
+                          <span style={{fontFamily:"JetBrains Mono",fontSize:11,color:t.muted}}>{name}</span>
+                          <span style={{fontSize:10,fontFamily:"JetBrains Mono",color:data.category==="malicious"?t.red:t.yellow,textAlign:"right",marginLeft:8}}>{data.result||data.category}</span>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
-                {flagged.length===0&&<div style={{textAlign:"center",padding:18,fontFamily:"Space Mono",fontSize:12,color:t.green}}>✓ Zero engines flagged this URL</div>}
+                {flagged.length===0&&<div style={{textAlign:"center",padding:18,fontFamily:"JetBrains Mono",fontSize:12,color:t.green}}>✓ Zero engines flagged this URL</div>}
                 {clean.length>0&&(
                   <details>
-                    <summary style={{fontSize:9,fontFamily:"Space Mono",color:t.muted,letterSpacing:1,textTransform:"uppercase",userSelect:"none",padding:"4px 0"}}>Clean Engines ({clean.length}) ▾</summary>
+                    <summary style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,letterSpacing:1,textTransform:"uppercase",userSelect:"none",padding:"4px 0"}}>Clean Engines ({clean.length}) ▾</summary>
                     <div style={{display:"flex",flexDirection:"column",gap:3,marginTop:6,maxHeight:240,overflowY:"auto"}}>
                       {clean.map(([name])=>(
                         <div key={name} style={{display:"flex",justifyContent:"space-between",padding:"6px 11px",borderRadius:8,background:t.inputBg,border:`1px solid ${t.border}`}}>
-                          <span style={{fontFamily:"Space Mono",fontSize:10,color:t.muted}}>{name}</span>
-                          <span style={{fontSize:10,fontFamily:"Space Mono",color:t.green}}>○ clean</span>
+                          <span style={{fontFamily:"JetBrains Mono",fontSize:10,color:t.muted}}>{name}</span>
+                          <span style={{fontSize:10,fontFamily:"JetBrains Mono",color:t.green}}>○ clean</span>
                         </div>
                       ))}
                     </div>
@@ -521,7 +542,7 @@ export default function App(){
             {/* ── SSL tab ───────────────────────────────────── */}
             {tab==="SSL"&&(
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                <div style={{fontSize:9,fontFamily:"Space Mono",color:t.muted,letterSpacing:1,textTransform:"uppercase"}}>SSL / TLS Certificate</div>
+                <div style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,letterSpacing:1,textTransform:"uppercase"}}>SSL / TLS Certificate</div>
                 <SSLCard ssl={ssl} t={t}/>
               </div>
             )}
@@ -534,7 +555,12 @@ export default function App(){
 
 
       </div>
-      <p style={{marginTop:16,fontSize:9,fontFamily:"Space Mono",color:t.muted,textAlign:"center"}}>500 scans/day · 4/min · Non-commercial use</p>
+      {result&&!bulkMode&&(
+        <button onClick={reset} style={{position:"fixed",bottom:`calc(clamp(14px,4vw,20px) + env(safe-area-inset-bottom))`,left:"50%",transform:"translateX(-50%)",padding:"12px 32px",borderRadius:99,border:"none",background:t.green,color:dark?"#0a0a0f":"#fff",fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:800,fontSize:14,cursor:"pointer",boxShadow:`0 4px 24px ${t.green}55`,zIndex:100,whiteSpace:"nowrap",touchAction:"manipulation",letterSpacing:0.3}}>
+          ↺ New Scan
+        </button>
+      )}
+      <p style={{marginTop:16,fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,textAlign:"center"}}>500 scans/day · 4/min · Non-commercial use</p>
     </div>
   </>);
 }
