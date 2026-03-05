@@ -425,16 +425,17 @@ export default function App(){
                 style={{background:loading||result?t.border:t.green,color:loading||result?t.muted:dark?"#0a0a0f":"#fff",cursor:loading?"not-allowed":"pointer"}}>
                 {loading?"…":result?"Reset":"Scan →"}
               </button>
-              {'BarcodeDetector' in window&&(
-                <button onClick={handleQR} title="Scan a QR code image"
-                  style={{width:44,minHeight:44,flexShrink:0,borderRadius:10,border:`1px solid ${t.border}`,background:t.surface,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
-                    <rect x="7" y="7" width="3" height="3" rx="0.5"/><rect x="14" y="7" width="3" height="3" rx="0.5"/><rect x="14" y="14" width="3" height="3" rx="0.5"/><rect x="7" y="14" width="3" height="3" rx="0.5"/>
-                  </svg>
-                </button>
-              )}
             </div>
+            {'BarcodeDetector' in window&&(
+              <button onClick={handleQR} title="Scan a QR code image"
+                style={{marginTop:6,width:"100%",padding:"9px",borderRadius:10,border:`1px solid ${t.border}`,background:t.surface,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
+                  <rect x="7" y="7" width="3" height="3" rx="0.5"/><rect x="14" y="7" width="3" height="3" rx="0.5"/><rect x="14" y="14" width="3" height="3" rx="0.5"/><rect x="7" y="14" width="3" height="3" rx="0.5"/>
+                </svg>
+                <span style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:700,fontSize:12,color:t.muted}}>Scan QR Code</span>
+              </button>
+            )}
             <input ref={qrInputRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={onQRFile}/>
             {(expandLoading||expanded)&&(
               <div style={{marginTop:6,padding:"6px 10px",borderRadius:8,background:t.inputBg,border:`1px solid ${t.border}`,fontSize:10,fontFamily:"JetBrains Mono",display:"flex",alignItems:"flex-start",gap:6}}>
@@ -467,6 +468,38 @@ export default function App(){
               </div>
             )}
           </div>
+        )}
+
+        {/* About / Guide */}
+        {!loading&&!result&&!bulkMode&&(
+          <details style={{marginTop:4}}>
+            <summary style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,letterSpacing:1,textTransform:"uppercase",userSelect:"none",padding:"2px 0",cursor:"pointer"}}>
+              About &amp; How to Use ▾
+            </summary>
+            <div style={{display:"flex",flexDirection:"column",gap:12,marginTop:12,padding:"14px 16px",borderRadius:12,background:t.inputBg,border:`1px solid ${t.border}`}}>
+              <div>
+                <p style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:800,fontSize:13,color:t.text,marginBottom:4}}>What is LinkGuard?</p>
+                <p style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:12,color:t.muted,lineHeight:1.6}}>LinkGuard is a free URL safety scanner powered by <strong style={{color:t.text}}>70+ security engines</strong>. Paste any link before clicking it — LinkGuard checks it for malware, phishing, scams, and suspicious redirects in seconds.</p>
+              </div>
+              <div style={{width:"100%",height:1,background:t.border}}/>
+              <div>
+                <p style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:800,fontSize:13,color:t.text,marginBottom:8}}>📖 How to use</p>
+                <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                  {[["🔗","Paste or type a URL","Drop any link into the input. Pasting auto-starts the scan."],["🔍","Hit Scan","Results arrive in 15–30 seconds as 70+ engines analyse the link."],["📊","Read the result","Overview shows your risk score. Swipe or tap tabs for details: Intel, Charts, Engines, SSL."],["📷","QR codes","Tap \u2018Scan QR Code\u2019 to decode a QR image directly from your camera or photo library."],["📃","Bulk scan","Toggle Bulk mode to paste multiple URLs at once — useful for checking several links quickly."],["⬇","Export","Download a full JSON report of any scan result for sharing or record-keeping."]].map(([icon,title,desc])=>(
+                    <div key={title} style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+                      <span style={{fontSize:14,flexShrink:0,marginTop:1}}>{icon}</span>
+                      <div><span style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:700,fontSize:12,color:t.text}}>{title} — </span><span style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:12,color:t.muted}}>{desc}</span></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div style={{width:"100%",height:1,background:t.border}}/>
+              <div style={{display:"flex",gap:8,padding:"8px 10px",borderRadius:9,background:`${t.yellow}0d`,border:`1px solid ${t.yellow}33`}}>
+                <span style={{fontSize:13,flexShrink:0}}>⚠️</span>
+                <p style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:11,color:t.muted,lineHeight:1.6}}>LinkGuard uses the <strong style={{color:t.text}}>VirusTotal free tier</strong> — limited to 500 scans/day and 4/minute. Results reflect the last cached analysis; click Re-scan if the data is stale.</p>
+              </div>
+            </div>
+          </details>
         )}
 
         {/* Scan history */}
@@ -691,43 +724,36 @@ export default function App(){
           ↺ New Scan
         </button>
       )}
-      <div style={{marginTop:20,display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
-        <div style={{display:"flex",gap:14,alignItems:"center"}}>
-          {/* LinkedIn */}
-          <a href="https://www.linkedin.com/in/carlos-miguel-torres-2644a9332/" target="_blank" rel="noopener noreferrer"
-            style={{display:"flex",alignItems:"center",gap:6,color:t.muted,textDecoration:"none",fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:11,fontWeight:600,padding:"6px 10px",borderRadius:8,border:`1px solid ${t.border}`,background:t.surface,transition:"all 0.2s"}}
-            onMouseEnter={e=>{e.currentTarget.style.borderColor="#0a66c2";e.currentTarget.style.color="#0a66c2";}}
-            onMouseLeave={e=>{e.currentTarget.style.borderColor=t.border;e.currentTarget.style.color=t.muted;}}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
-            LinkedIn
-          </a>
-          {/* Facebook */}
-          <a href="https://www.facebook.com/JenxxAi" target="_blank" rel="noopener noreferrer"
-            style={{display:"flex",alignItems:"center",gap:6,color:t.muted,textDecoration:"none",fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:11,fontWeight:600,padding:"6px 10px",borderRadius:8,border:`1px solid ${t.border}`,background:t.surface,transition:"all 0.2s"}}
-            onMouseEnter={e=>{e.currentTarget.style.borderColor="#1877f2";e.currentTarget.style.color="#1877f2";}}
-            onMouseLeave={e=>{e.currentTarget.style.borderColor=t.border;e.currentTarget.style.color=t.muted;}}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-            Facebook
-          </a>
-          {/* GitHub */}
-          <a href="https://github.com/JenxxAI" target="_blank" rel="noopener noreferrer"
-            style={{display:"flex",alignItems:"center",gap:6,color:t.muted,textDecoration:"none",fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:11,fontWeight:600,padding:"6px 10px",borderRadius:8,border:`1px solid ${t.border}`,background:t.surface,transition:"all 0.2s"}}
-            onMouseEnter={e=>{e.currentTarget.style.borderColor=t.text;e.currentTarget.style.color=t.text;}}
-            onMouseLeave={e=>{e.currentTarget.style.borderColor=t.border;e.currentTarget.style.color=t.muted;}}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
-            GitHub
-          </a>
-        </div>
-        {/* Company banner */}
+      {/* ── Footer ───────────────────────────────────────────── */}
+      <div style={{width:"100%",maxWidth:560,marginTop:24,display:"flex",flexDirection:"column",alignItems:"center",gap:12,paddingBottom:`calc(clamp(16px,4vw,24px) + env(safe-area-inset-bottom))`}}>
+        {/* Acentra Tech banner */}
         <a href="https://acentratech.web.app/" target="_blank" rel="noopener noreferrer"
-          style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"12px 22px",borderRadius:12,border:`1px solid ${t.green}44`,background:`${t.green}08`,textDecoration:"none",transition:"all 0.2s",maxWidth:320,width:"100%",cursor:"pointer"}}
+          style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"12px 22px",borderRadius:12,border:`1px solid ${t.green}44`,background:`${t.green}08`,textDecoration:"none",transition:"all 0.2s",width:"100%",cursor:"pointer"}}
           onMouseEnter={e=>{e.currentTarget.style.borderColor=t.green;e.currentTarget.style.background=`${t.green}12`;}}
           onMouseLeave={e=>{e.currentTarget.style.borderColor=`${t.green}44`;e.currentTarget.style.background=`${t.green}08`;}}>
           <span style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:800,fontSize:13,color:t.green,letterSpacing:0.3}}>✦ Acentra Tech</span>
           <span style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:11,color:t.muted,textAlign:"center"}}>We're just getting started — but there's more where this came from.</span>
           <span style={{fontFamily:"JetBrains Mono",fontSize:9,color:`${t.green}99`,marginTop:2}}>acentratech.web.app →</span>
         </a>
-        <p style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,textAlign:"center"}}>500 scans/day · 4/min · Non-commercial use</p>
+        {/* Social links */}
+        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",justifyContent:"center"}}>
+          {[
+            {href:"https://www.linkedin.com/in/carlos-miguel-torres-2644a9332/",label:"LinkedIn",hc:"#0a66c2",
+              icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>},
+            {href:"https://www.facebook.com/JenxxAi",label:"Facebook",hc:"#1877f2",
+              icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>},
+            {href:"https://github.com/JenxxAI",label:"GitHub",hc:t.text,
+              icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>}
+          ].map(({href,label,hc,icon})=>(
+            <a key={label} href={href} target="_blank" rel="noopener noreferrer"
+              style={{display:"flex",alignItems:"center",gap:5,color:t.muted,textDecoration:"none",fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:11,fontWeight:600,padding:"6px 12px",borderRadius:8,border:`1px solid ${t.border}`,background:t.surface,transition:"all 0.2s"}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor=hc;e.currentTarget.style.color=hc;}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor=t.border;e.currentTarget.style.color=t.muted;}}>
+              {icon}{label}
+            </a>
+          ))}
+        </div>
+        <p style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,textAlign:"center",opacity:0.7}}>500 scans/day · 4/min · Non-commercial use</p>
       </div>
     </div>
   </>);
