@@ -130,13 +130,13 @@ function CategoryTags({categories,t}){
 
 // ── SSL Card ───────────────────────────────────────────────────────────
 function SSLCard({ssl,t}){
-  if(!ssl)return<InfoRow icon="🔓" label="SSL" value="No certificate data available" color={t.muted} t={t}/>;
+  if(!ssl)return<InfoRow icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>} label="SSL" value="No certificate data available" color={t.muted} t={t}/>;
   const exp=ssl.cert_validity_date?new Date(ssl.cert_validity_date*1000).toLocaleDateString():"N/A";
   const valid=ssl.cert_validity_date?(ssl.cert_validity_date*1000>Date.now()):null;
   return(
     <div style={{display:"flex",flexDirection:"column",gap:6,padding:"12px 14px",borderRadius:12,background:t.inputBg,border:`1px solid ${valid===false?t.red:t.border}`}}>
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:2}}>
-        <span>{valid===false?"🔓":"🔒"}</span>
+        <span style={{color:valid===false?t.red:t.green,display:"flex"}}>{valid===false?(<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>):(<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>)}</span>
         <span style={{fontFamily:"JetBrains Mono",fontSize:11,fontWeight:700,color:valid===false?t.red:t.green}}>{valid===false?"EXPIRED SSL":valid?"VALID SSL":"SSL INFO"}</span>
       </div>
       {[["Issuer",ssl.cert_issuer],["Subject",ssl.cert_subject],["Expires",exp],["Serial",ssl.cert_serial_number]].filter(([,v])=>v&&v!=="N/A").map(([k,v])=>(
@@ -667,14 +667,14 @@ export default function App(){
             {/* ── Intel ─────────────────────────────────────── */}
             {tab==="Intel"&&(
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                <InfoRow icon="🌐" label="Final URL" value={result.url||scannedUrl} t={t}/>
-                {result.tld&&<InfoRow icon="📌" label="TLD" value={result.tld} t={t}/>}
-                {result.last_http_response_code&&<InfoRow icon="📡" label="HTTP Status" value={`${result.last_http_response_code}`} color={result.last_http_response_code===200?t.green:t.yellow} t={t}/>}
-                {result.last_http_response_content_type&&<InfoRow icon="📄" label="Content Type" value={result.last_http_response_content_type} t={t}/>}
-                {result.last_http_response_content_length&&<InfoRow icon="📦" label="Response Size" value={`${(result.last_http_response_content_length/1024).toFixed(1)} KB`} t={t}/>}
+                <InfoRow icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>} label="Final URL" value={result.url||scannedUrl} t={t}/>
+                {result.tld&&<InfoRow icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>} label="TLD" value={result.tld} t={t}/>}
+                {result.last_http_response_code&&<InfoRow icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>} label="HTTP Status" value={`${result.last_http_response_code}`} color={result.last_http_response_code===200?t.green:t.yellow} t={t}/>}
+                {result.last_http_response_content_type&&<InfoRow icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>} label="Content Type" value={result.last_http_response_content_type} t={t}/>}
+                {result.last_http_response_content_length&&<InfoRow icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>} label="Response Size" value={`${(result.last_http_response_content_length/1024).toFixed(1)} KB`} t={t}/>}
                 {redirects.length>0&&(
                   <div style={{padding:"12px 14px",borderRadius:12,background:t.inputBg,border:`1px solid ${t.yellow}44`}}>
-                    <div style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>🔀 Redirect Chain ({redirects.length} hops)</div>
+                    <div style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,letterSpacing:1,textTransform:"uppercase",marginBottom:8,display:"flex",alignItems:"center",gap:5}}><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>Redirect Chain ({redirects.length} hops)</div>
                     {redirects.map((r,i)=>(
                       <div key={i} style={{display:"flex",gap:8,alignItems:"flex-start",marginBottom:i<redirects.length-1?6:0}}>
                         <span style={{fontFamily:"JetBrains Mono",fontSize:9,color:t.muted,flexShrink:0,paddingTop:1}}>#{i+1}</span>
@@ -683,7 +683,7 @@ export default function App(){
                     ))}
                   </div>
                 )}
-                {redirects.length===0&&<InfoRow icon="✅" label="Redirects" value="No redirects detected" color={t.green} t={t}/>}
+                {redirects.length===0&&<InfoRow icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.green} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>} label="Redirects" value="No redirects detected" color={t.green} t={t}/>}
                 <SSLCard ssl={ssl} t={t}/>
               </div>
             )}
@@ -703,7 +703,7 @@ export default function App(){
                 </div>
                 {/* Stats grid */}
                 <div className="info-grid">
-                  {[["🔴 Malicious",mal,t.red],["🟡 Suspicious",sus,t.yellow],["✅ Harmless",har,t.green],["⚪ Undetected",und,t.muted]].map(([lbl,val,color],i)=>(
+                  {[["Malicious",mal,t.red],["Suspicious",sus,t.yellow],["Harmless",har,t.green],["Undetected",und,t.muted]].map(([lbl,val,color],i)=>(
                     <div key={i} style={{padding:"clamp(10px,3vw,14px)",borderRadius:12,background:t.inputBg,border:`1px solid ${color}33`,display:"flex",flexDirection:"column",gap:4}}>
                       <span style={{fontSize:"clamp(18px,5vw,24px)",fontWeight:800,fontFamily:"JetBrains Mono",color}}>{val}</span>
                       <span style={{fontSize:10,color:t.muted,fontFamily:"JetBrains Mono"}}>{lbl}</span>
@@ -848,7 +848,7 @@ export default function App(){
         {/* Social links */}
         <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",justifyContent:"center"}}>
           {[
-            {href:"https://www.linkedin.com/company/112716189/",label:"LinkedIn",hc:"#0a66c2",
+            {href:"https://www.linkedin.com/company/acentratechsolution/",label:"LinkedIn",hc:"#0a66c2",
               icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>},
             {href:"https://www.facebook.com/profile.php?id=61587725532022",label:"Facebook",hc:"#1877f2",
               icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>},
