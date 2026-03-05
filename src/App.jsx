@@ -65,19 +65,27 @@ function DonutChart({mal,sus,har,und,t}){
   );
 }
 
-// ── Gauge ──────────────────────────────────────────────────────────────
+// ── Gauge (animated counter) ─────────────────────────────────────────
 function RiskGauge({score,label,colorKey,t}){
-  const angle=-135+(score/100)*270,color=t[colorKey]||t.muted;
+  const [disp,setDisp]=useState(0);
+  useEffect(()=>{
+    if(!score){setDisp(0);return;}
+    let start=null;const dur=900;
+    const step=ts=>{if(!start)start=ts;const p=Math.min((ts-start)/dur,1);setDisp(Math.round(p*score));if(p<1)requestAnimationFrame(step);};
+    const raf=requestAnimationFrame(step);
+    return()=>cancelAnimationFrame(raf);
+  },[score]);
+  const angle=-135+(disp/100)*270,color=t[colorKey]||t.muted;
   return(
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
       <svg viewBox="0 0 120 80" width="100" height="67">
         <path d="M10 70 A50 50 0 0 1 110 70" fill="none" stroke={t.border} strokeWidth="10" strokeLinecap="round"/>
         <path d="M10 70 A50 50 0 0 1 110 70" fill="none" stroke={color} strokeWidth="10" strokeLinecap="round"
-          strokeDasharray="157" strokeDashoffset={157-(score/100)*157} style={{transition:"stroke-dashoffset 0.9s"}}/>
+          strokeDasharray="157" strokeDashoffset={157-(disp/100)*157}/>
         <line x1="60" y1="70" x2="60" y2="28" stroke={color} strokeWidth="3" strokeLinecap="round"
-          style={{transformOrigin:"60px 70px",transform:`rotate(${angle}deg)`,transition:"transform 0.9s"}}/>
+          style={{transformOrigin:"60px 70px",transform:`rotate(${angle}deg)`}}/>
         <circle cx="60" cy="70" r="5" fill={color}/>
-        <text x="60" y="60" textAnchor="middle" fill={t.text} style={{fontFamily:"JetBrains Mono",fontSize:15,fontWeight:700}}>{score}</text>
+        <text x="60" y="60" textAnchor="middle" fill={t.text} style={{fontFamily:"JetBrains Mono",fontSize:15,fontWeight:700}}>{disp}</text>
       </svg>
       <span style={{fontFamily:"JetBrains Mono",fontSize:10,fontWeight:700,color,letterSpacing:1}}>{label.toUpperCase()}</span>
     </div>
@@ -199,6 +207,9 @@ export default function App(){
   const [history,setHistory]=useState(()=>{try{return JSON.parse(localStorage.getItem('lg_history')||'[]');}catch{return[];}});
   const [expanded,setExpanded]=useState(null);
   const [expandLoading,setExpandLoading]=useState(false);
+  const [copiedEngine,setCopiedEngine]=useState(null);
+  const [showLegend,setShowLegend]=useState(false);
+  const qrInputRef=useRef(null);
 
   // ── expand short URLs ────────────────────────────────────────────────
   useEffect(()=>{
@@ -211,6 +222,20 @@ export default function App(){
       .catch(()=>setExpandLoading(false));
     return()=>ctrl.abort();
   },[url]);
+
+  // ── QR scanner ───────────────────────────────────────────────────────
+  const handleQR=()=>qrInputRef.current?.click();
+  const onQRFile=async e=>{
+    const file=e.target.files?.[0];if(!file)return;e.target.value='';
+    try{
+      const bd=new window.BarcodeDetector({formats:['qr_code']});
+      const bmp=await createImageBitmap(file);
+      const codes=await bd.detect(bmp);
+      const found=codes.find(c=>c.rawValue?.startsWith('http'))?.rawValue;
+      if(found){setUrl(found);setTimeout(()=>doScan(found),50);}
+      else setError('No URL found in QR code.');
+    }catch{setError('QR scanning is not supported in this browser.');}
+  };
 
   // ── single scan ──────────────────────────────────────────────────────
   const doScan=useCallback(async(su,silent=false)=>{
@@ -284,6 +309,7 @@ export default function App(){
   // ── share / copy ─────────────────────────────────────────────────────
   const handleShare=async()=>{const link=`${window.location.href.split("#")[0]}#${btoa(JSON.stringify({u:scannedUrl}))}`;if(navigator.share){try{await navigator.share({title:`LinkGuard — ${shortUrl(scannedUrl)}`,url:link});}catch(e){if(e?.name!=="AbortError"){navigator.clipboard.writeText(link);setShareMsg("Copied!");setTimeout(()=>setShareMsg(null),2000);}}}else{try{navigator.clipboard.writeText(link);setShareMsg("Copied!");setTimeout(()=>setShareMsg(null),2000);}catch{setShareMsg("Error");}}};
   const handleCopy=()=>{if(!result)return;const s=result.stats||{},m=s.malicious||0,ss=s.suspicious||0,tot=m+ss+(s.harmless||0)+(s.undetected||0),risk=getRisk(m,ss,tot);navigator.clipboard.writeText(`🔍 LinkGuard Scan\n🔗 ${scannedUrl}\n⚠️ Risk: ${risk.label} (${risk.score}/100)\n🔴 Malicious: ${m}  🟡 Suspicious: ${ss}  ✅ Harmless: ${s.harmless||0}\n📊 ${tot} engines checked`);setCopyMsg("Copied!");setTimeout(()=>setCopyMsg(null),2000);};
+  const handleExport=()=>{if(!result)return;const report={url:scannedUrl,scannedAt:result.date?new Date(result.date*1000).toISOString():new Date().toISOString(),risk:{label:risk.label,score:risk.score},stats:{malicious:mal,suspicious:sus,harmless:har,undetected:und,total:tot},flaggedEngines:flagged.map(([name,data])=>({name,category:data.category,result:data.result||null})),categories:result.categories||{},redirectChain:redirects,ssl:ssl?{issuer:ssl.cert_issuer,subject:ssl.cert_subject,expires:ssl.cert_validity_date?new Date(ssl.cert_validity_date*1000).toLocaleDateString():null}:null};const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`linkguard-${shortUrl(scannedUrl).replace(/[^a-z0-9]/gi,'-')}.json`;a.click();URL.revokeObjectURL(a.href);};
 
   const reset=()=>{clearTimeout(pollRef.current);setResult(null);setError(null);setLoading(false);setPhase(null);setUrl("");setScannedUrl("");setExpanded(null);document.title="LinkGuard";};
 
@@ -296,6 +322,19 @@ export default function App(){
   const ssl=result?.last_https_certificate;
   const redirects=result?.redirection_chain||[];
   const lastAnalysisDate=result?.date?new Date(result.date*1000).toLocaleString():null;
+  const scanAgeDays=result?.date?Math.floor((Date.now()-result.date*1000)/86400000):0;
+  const isStale=scanAgeDays>=7;
+
+  // ── keyboard shortcut (Cmd/Ctrl + Enter) ────────────────────────────
+  useEffect(()=>{
+    const h=e=>{
+      if((e.metaKey||e.ctrlKey)&&e.key==='Enter'&&!loading&&!bulkMode){
+        if(result)reset();else if(url)doScan(url);
+      }
+    };
+    window.addEventListener('keydown',h);
+    return()=>window.removeEventListener('keydown',h);
+  },[loading,bulkMode,result,url,doScan]);
 
   const TABS=["Overview","Intel","Charts","Engines","SSL"];
 
@@ -386,7 +425,17 @@ export default function App(){
                 style={{background:loading||result?t.border:t.green,color:loading||result?t.muted:dark?"#0a0a0f":"#fff",cursor:loading?"not-allowed":"pointer"}}>
                 {loading?"…":result?"Reset":"Scan →"}
               </button>
+              {'BarcodeDetector' in window&&(
+                <button onClick={handleQR} title="Scan a QR code image"
+                  style={{width:44,minHeight:44,flexShrink:0,borderRadius:10,border:`1px solid ${t.border}`,background:t.surface,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
+                    <rect x="7" y="7" width="3" height="3" rx="0.5"/><rect x="14" y="7" width="3" height="3" rx="0.5"/><rect x="14" y="14" width="3" height="3" rx="0.5"/><rect x="7" y="14" width="3" height="3" rx="0.5"/>
+                  </svg>
+                </button>
+              )}
             </div>
+            <input ref={qrInputRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={onQRFile}/>
             {(expandLoading||expanded)&&(
               <div style={{marginTop:6,padding:"6px 10px",borderRadius:8,background:t.inputBg,border:`1px solid ${t.border}`,fontSize:10,fontFamily:"JetBrains Mono",display:"flex",alignItems:"flex-start",gap:6}}>
                 {expandLoading
@@ -476,15 +525,23 @@ export default function App(){
             {/* URL + action row */}
             <div style={{display:"flex",gap:"clamp(4px,2vw,8px)",alignItems:"center",padding:"clamp(8px,2vw,10px) clamp(10px,2.5vw,13px)",borderRadius:10,background:t.inputBg,border:`1px solid ${t.border}`,flexWrap:"wrap"}}>
               <span style={{fontFamily:"JetBrains Mono",fontSize:"clamp(9px,2.5vw,11px)",color:t.code,flex:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",minWidth:80}}>{scannedUrl}</span>
-              {[[copyMsg||"📋",handleCopy],[shareMsg||"🔗",handleShare],["🔁",()=>doScan(scannedUrl)]].map(([lbl,fn],i)=>(
+              {[[copyMsg||"📋",handleCopy],[shareMsg||"🔗",handleShare],["⬇",handleExport],["🔁",()=>doScan(scannedUrl)]].map(([lbl,fn],i)=>(
+
                 <button key={i} onClick={fn}
                   className="action-btn"
                   style={{border:`1px solid ${t.border}`,background:t.surface,color:t.muted}}
                   onMouseEnter={e=>e.currentTarget.style.borderColor=t.green} onMouseLeave={e=>e.currentTarget.style.borderColor=t.border}
-                  title={["Copy results","Share link","Re-scan"][i]}>{lbl}</button>
+                  title={["Copy results","Share link","Export JSON","Re-scan"][i]}>{lbl}</button>
               ))}
             </div>
 
+            {/* Stale scan warning */}
+            {isStale&&(
+              <div style={{padding:"8px 12px",borderRadius:10,background:`${t.yellow}0d`,border:`1px solid ${t.yellow}44`,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+                <span style={{fontSize:10,fontFamily:"JetBrains Mono",color:t.yellow}}>⚠ Analysis is {scanAgeDays} day{scanAgeDays>1?'s':''} old — results may be outdated.</span>
+                <button onClick={()=>doScan(scannedUrl)} style={{fontSize:10,fontFamily:"JetBrains Mono",color:t.yellow,background:"transparent",border:`1px solid ${t.yellow}55`,borderRadius:6,padding:"3px 8px",cursor:"pointer"}}>Re-scan</button>
+              </div>
+            )}
             {/* Tab bar — scrollable on mobile */}
             <div className="tab-bar" style={{background:t.inputBg,border:`1px solid ${t.border}`}}>
               {TABS.map(id=><button key={id} className="tab-btn" onClick={()=>setTab(id)}
@@ -503,6 +560,23 @@ export default function App(){
                   </div>
                 </div>
                 <ThreatBar mal={mal} sus={sus} har={har} und={und} t={t}/>
+                {/* Legend toggle */}
+                <div style={{display:"flex",justifyContent:"flex-end"}}>
+                  <button onClick={()=>setShowLegend(s=>!s)}
+                    style={{fontSize:10,fontFamily:"JetBrains Mono",color:t.muted,background:"transparent",border:`1px solid ${t.border}`,borderRadius:6,padding:"3px 8px",cursor:"pointer"}}>
+                    {showLegend?"Hide legend":"What does this mean?"}
+                  </button>
+                </div>
+                {showLegend&&(
+                  <div style={{display:"flex",flexDirection:"column",gap:6,padding:"12px 14px",borderRadius:12,background:t.inputBg,border:`1px solid ${t.border}`}}>
+                    {[[t.red,"Malicious","Confirmed harmful — phishing, malware, scam, or exploit."],[t.yellow,"Suspicious","Flagged but not confirmed; treat with caution."],[t.green,"Harmless","Engine found no threats and considers this URL safe."],[t.muted,"Undetected","Engine did not analyse or has no data for this URL."]].map(([c,lbl,desc])=>(
+                      <div key={lbl} style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+                        <div style={{width:8,height:8,borderRadius:2,background:c,marginTop:3,flexShrink:0}}/>
+                        <div><span style={{fontFamily:"JetBrains Mono",fontSize:10,fontWeight:700,color:c}}>{lbl}: </span><span style={{fontFamily:"JetBrains Mono",fontSize:10,color:t.muted}}>{desc}</span></div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -565,12 +639,17 @@ export default function App(){
                   <div>
                     <div style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,letterSpacing:1,marginBottom:6,textTransform:"uppercase"}}>Flagged ({flagged.length})</div>
                     <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:260,overflowY:"auto"}}>
-                      {flagged.map(([name,data])=>(
-                        <div key={name} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 11px",borderRadius:9,background:data.category==="malicious"?`${t.red}0a`:`${t.yellow}0a`,border:`1px solid ${data.category==="malicious"?t.red:t.yellow}33`}}>
-                          <span style={{fontFamily:"JetBrains Mono",fontSize:11,color:t.muted}}>{name}</span>
-                          <span style={{fontSize:10,fontFamily:"JetBrains Mono",color:data.category==="malicious"?t.red:t.yellow,textAlign:"right",marginLeft:8}}>{data.result||data.category}</span>
-                        </div>
-                      ))}
+                      {flagged.map(([name,data])=>{
+                        const ec=data.category==="malicious"?t.red:t.yellow;
+                        return(
+                          <button key={name} onClick={()=>{navigator.clipboard.writeText(`${name}: ${data.result||data.category}`);setCopiedEngine(name);setTimeout(()=>setCopiedEngine(null),1500);}}
+                            title="Click to copy"
+                            style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 11px",borderRadius:9,background:copiedEngine===name?`${ec}22`:`${ec}0a`,border:`1px solid ${ec}33`,cursor:"pointer",textAlign:"left",width:"100%",transition:"background 0.2s"}}>
+                            <span style={{fontFamily:"JetBrains Mono",fontSize:11,color:t.muted}}>{name}</span>
+                            <span style={{fontSize:10,fontFamily:"JetBrains Mono",color:copiedEngine===name?ec:ec,textAlign:"right",marginLeft:8}}>{copiedEngine===name?"Copied!":data.result||data.category}</span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
