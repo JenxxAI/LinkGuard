@@ -185,7 +185,7 @@ function BulkRow({item,t}){
 //  MAIN APP
 // ═══════════════════════════════════════════════════════════════════════
 export default function App(){
-  const [dark,setDark]=useState(true);
+  const [dark,setDark]=useState(()=>window.matchMedia?.('(prefers-color-scheme:dark)').matches??true);
   const t=dark?DARK:LIGHT;
   const [url,setUrl]=useState("");
   const [loading,setLoading]=useState(false);
@@ -210,6 +210,7 @@ export default function App(){
   const [copiedEngine,setCopiedEngine]=useState(null);
   const [showLegend,setShowLegend]=useState(false);
   const [showAbout,setShowAbout]=useState(false);
+  const [fromCache,setFromCache]=useState(false);
   const qrInputRef=useRef(null);
 
   // ── expand short URLs ────────────────────────────────────────────────
@@ -242,6 +243,21 @@ export default function App(){
   const doScan=useCallback(async(su,silent=false)=>{
     if(!su?.trim()){if(!silent)setError("Enter a URL to scan.");return null;}
     try{new URL(su.trim());}catch{if(!silent)setError("Enter a valid URL (must start with http:// or https://)");return null;}
+    // ── check local result cache (24h) ──────────────────────────────
+    if(!silent){
+      try{
+        const cached=JSON.parse(localStorage.getItem('lg_rslt_'+su.trim())||'null');
+        if(cached?.ts&&Date.now()-cached.ts<86400000){
+          const{attrs}=cached;
+          setError(null);setResult(attrs);setPhase("done");setLoading(false);
+          setScannedUrl(su.trim());setTab("Overview");setFromCache(true);
+          const s=attrs?.stats||{},m=s.malicious||0,ss=s.suspicious||0,tot=m+ss+(s.harmless||0)+(s.undetected||0)+(s.timeout||0);
+          const rk=getRisk(m,ss,tot);
+          document.title=`${m>0||ss>0?'⚠':'✓'} ${rk.label} — LinkGuard`;
+          return attrs;
+        }
+      }catch{}
+    }
     if(!silent){setError(null);setResult(null);setLoading(true);setPhase("submitting");setScannedUrl(su.trim());setTab("Overview");}
     try{
       const fd=new URLSearchParams();fd.append("url",su.trim());
@@ -269,6 +285,8 @@ export default function App(){
             const rk=getRisk(m,ss,tot);
             setHistory(prev=>{const entry={url:su.trim(),label:rk.label,color:rk.color,score:rk.score,date:Date.now()};const next=[entry,...prev.filter(x=>x.url!==su.trim())].slice(0,20);localStorage.setItem('lg_history',JSON.stringify(next));return next;});
             if(!silent)document.title=`${m>0||ss>0?'⚠':'✓'} ${rk.label} — LinkGuard`;
+            try{localStorage.setItem('lg_rslt_'+su.trim(),JSON.stringify({attrs,ts:Date.now()}));}catch{}
+            if(!silent)setFromCache(false);
             resolve({malicious:m,suspicious:ss,harmless:h,undetected:u,total:tot,attrs});
           }else{pollRef.current=setTimeout(poll,3000);}
         };poll();
@@ -308,11 +326,15 @@ export default function App(){
   };
 
   // ── share / copy ─────────────────────────────────────────────────────
-  const handleShare=async()=>{const link=`${window.location.href.split("#")[0]}#${btoa(JSON.stringify({u:scannedUrl}))}`;if(navigator.share){try{await navigator.share({title:`LinkGuard — ${shortUrl(scannedUrl)}`,url:link});}catch(e){if(e?.name!=="AbortError"){navigator.clipboard.writeText(link);setShareMsg("Copied!");setTimeout(()=>setShareMsg(null),2000);}}}else{try{navigator.clipboard.writeText(link);setShareMsg("Copied!");setTimeout(()=>setShareMsg(null),2000);}catch{setShareMsg("Error");}}};
+  const handleShare=async()=>{
+    let link=window.location.href.split("?")[0].split("#")[0];
+    try{const sr=await fetch('/api/share',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({result,url:scannedUrl})});const sd=await sr.json();if(sd.key)link+=`?r=${sd.key}`;}catch{}
+    if(navigator.share){try{await navigator.share({title:`LinkGuard — ${shortUrl(scannedUrl)}`,url:link});}catch(e){if(e?.name!=="AbortError"){navigator.clipboard.writeText(link);setShareMsg("Copied!");setTimeout(()=>setShareMsg(null),2000);}}}else{try{navigator.clipboard.writeText(link);setShareMsg("Copied!");setTimeout(()=>setShareMsg(null),2000);}catch{setShareMsg("Error");}}
+  };
   const handleCopy=()=>{if(!result)return;const s=result.stats||{},m=s.malicious||0,ss=s.suspicious||0,tot=m+ss+(s.harmless||0)+(s.undetected||0),risk=getRisk(m,ss,tot);navigator.clipboard.writeText(`🔍 LinkGuard Scan\n🔗 ${scannedUrl}\n⚠️ Risk: ${risk.label} (${risk.score}/100)\n🔴 Malicious: ${m}  🟡 Suspicious: ${ss}  ✅ Harmless: ${s.harmless||0}\n📊 ${tot} engines checked`);setCopyMsg("Copied!");setTimeout(()=>setCopyMsg(null),2000);};
   const handleExport=()=>{if(!result)return;const report={url:scannedUrl,scannedAt:result.date?new Date(result.date*1000).toISOString():new Date().toISOString(),risk:{label:risk.label,score:risk.score},stats:{malicious:mal,suspicious:sus,harmless:har,undetected:und,total:tot},flaggedEngines:flagged.map(([name,data])=>({name,category:data.category,result:data.result||null})),categories:result.categories||{},redirectChain:redirects,ssl:ssl?{issuer:ssl.cert_issuer,subject:ssl.cert_subject,expires:ssl.cert_validity_date?new Date(ssl.cert_validity_date*1000).toLocaleDateString():null}:null};const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`linkguard-${shortUrl(scannedUrl).replace(/[^a-z0-9]/gi,'-')}.json`;a.click();URL.revokeObjectURL(a.href);};
 
-  const reset=()=>{clearTimeout(pollRef.current);setResult(null);setError(null);setLoading(false);setPhase(null);setUrl("");setScannedUrl("");setExpanded(null);document.title="LinkGuard";};
+  const reset=()=>{clearTimeout(pollRef.current);setResult(null);setError(null);setLoading(false);setPhase(null);setUrl("");setScannedUrl("");setExpanded(null);setFromCache(false);document.title="LinkGuard"};
 
   // ── derived state ────────────────────────────────────────────────────
   const s=result?.stats||{},mal=s.malicious||0,sus=s.suspicious||0,har=s.harmless||0,und=s.undetected||0,tot=mal+sus+har+und+(s.timeout||0);
@@ -336,6 +358,21 @@ export default function App(){
     window.addEventListener('keydown',h);
     return()=>window.removeEventListener('keydown',h);
   },[loading,bulkMode,result,url,doScan]);
+
+  // ── load shared result from ?r= URL param ────────────────────────
+  useEffect(()=>{
+    const key=new URLSearchParams(window.location.search).get('r');
+    if(!key)return;
+    fetch(`/api/share/${key}`)
+      .then(r=>r.ok?r.json():null)
+      .then(d=>{
+        if(!d?.result||!d?.url)return;
+        setResult(d.result);setScannedUrl(d.url);setPhase("done");setFromCache(true);
+        const s=d.result?.stats||{},m=s.malicious||0,ss=s.suspicious||0,tot=m+ss+(s.harmless||0)+(s.undetected||0)+(s.timeout||0);
+        const rk=getRisk(m,ss,tot);
+        document.title=`${m>0||ss>0?'⚠':'✓'} ${rk.label} — LinkGuard`;
+      }).catch(()=>{});
+  },[]);
 
   const TABS=["Overview","Intel","Charts","Engines","SSL"];
 
@@ -405,7 +442,7 @@ export default function App(){
       </div>
 
       {/* ── Main Card ──────────────────────────────────────────── */}
-      <div className="card" style={{maxWidth:680}}>
+      <div className="card" style={{maxWidth:680,borderColor:result?rc:undefined}}>
 
         {/* API Key section removed — key is stored in .env on the server */}
 
@@ -438,6 +475,14 @@ export default function App(){
               </button>
             )}
             <input ref={qrInputRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={onQRFile}/>
+            {url&&url.startsWith('http://')&&!url.startsWith('https://')&&(
+              <div style={{marginTop:6,display:"flex",gap:7,padding:"7px 10px",borderRadius:8,background:`${t.yellow}0d`,border:`1px solid ${t.yellow}33`,alignItems:"center"}}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={t.yellow} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                <span style={{fontFamily:"JetBrains Mono",fontSize:10,color:t.yellow}}>This URL uses plain HTTP — data is not encrypted.</span>
+              </div>
+            )}
             {(expandLoading||expanded)&&(
               <div style={{marginTop:6,padding:"6px 10px",borderRadius:8,background:t.inputBg,border:`1px solid ${t.border}`,fontSize:10,fontFamily:"JetBrains Mono",display:"flex",alignItems:"flex-start",gap:6}}>
                 {expandLoading
@@ -544,10 +589,24 @@ export default function App(){
                 <button onClick={()=>doScan(scannedUrl)} style={{fontSize:10,fontFamily:"JetBrains Mono",color:t.yellow,background:"transparent",border:`1px solid ${t.yellow}55`,borderRadius:6,padding:"3px 8px",cursor:"pointer"}}>Re-scan</button>
               </div>
             )}
+            {/* Cached result banner */}
+            {fromCache&&(
+              <div style={{padding:"7px 12px",borderRadius:10,background:`${t.blue}0d`,border:`1px solid ${t.blue}33`,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+                <span style={{fontSize:10,fontFamily:"JetBrains Mono",color:t.blue}}>⚡ Showing cached result</span>
+                <button onClick={()=>{try{localStorage.removeItem('lg_rslt_'+scannedUrl);}catch{}setFromCache(false);doScan(scannedUrl);}} style={{fontSize:10,fontFamily:"JetBrains Mono",color:t.blue,background:"transparent",border:`1px solid ${t.blue}44`,borderRadius:6,padding:"3px 8px",cursor:"pointer"}}>Re-scan</button>
+              </div>
+            )}
             {/* Tab bar — scrollable on mobile */}
             <div className="tab-bar" style={{background:t.inputBg,border:`1px solid ${t.border}`}}>
-              {TABS.map(id=><button key={id} className="tab-btn" onClick={()=>setTab(id)}
-                style={{background:tab===id?t.green:"transparent",color:tab===id?(dark?"#0a0a0f":"#fff"):t.muted}}>{id}</button>)}
+              {TABS.map(id=>(
+                <button key={id} className="tab-btn" onClick={()=>setTab(id)}
+                  style={{background:tab===id?t.green:"transparent",color:tab===id?(dark?"#0a0a0f":"#fff"):t.muted,position:"relative"}}>
+                  {id}
+                  {id==="Engines"&&flagged.length>0&&(
+                    <span style={{position:"absolute",top:3,right:3,minWidth:14,height:14,borderRadius:99,background:t.red,fontSize:8,fontFamily:"JetBrains Mono",fontWeight:700,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",pointerEvents:"none",lineHeight:1}}>{flagged.length}</span>
+                  )}
+                </button>
+              ))}
             </div>
 
             {/* ── Overview ──────────────────────────────────── */}
@@ -558,6 +617,12 @@ export default function App(){
                   <div style={{flex:1,minWidth:160}}>
                     <div style={{fontSize:17,fontWeight:800,color:rc,letterSpacing:-0.5}}>{mal===0&&sus===0?"✓ No threats detected":`⚠ ${mal+sus} engine${mal+sus>1?"s":""} flagged`}</div>
                     <div style={{fontSize:11,color:t.muted,marginTop:5,fontFamily:"JetBrains Mono"}}>{tot} engines · {lastAnalysisDate||"just now"}</div>
+                    {(mal>0||sus>0)&&(
+                      <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
+                        {mal>0&&<span style={{padding:"3px 10px",borderRadius:99,fontSize:10,fontFamily:"JetBrains Mono",fontWeight:700,background:`${t.red}18`,color:t.red,border:`1px solid ${t.red}33`}}>{mal} malicious</span>}
+                        {sus>0&&<span style={{padding:"3px 10px",borderRadius:99,fontSize:10,fontFamily:"JetBrains Mono",fontWeight:700,background:`${t.yellow}18`,color:t.yellow,border:`1px solid ${t.yellow}33`}}>{sus} suspicious</span>}
+                      </div>
+                    )}
                     {result.categories&&Object.keys(result.categories).length>0&&<div style={{marginTop:8}}><CategoryTags categories={result.categories} t={t}/></div>}
                   </div>
                 </div>

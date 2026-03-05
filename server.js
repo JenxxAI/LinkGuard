@@ -81,5 +81,36 @@ app.get('/api/expand', async (req, res) => {
   }
 });
 
+// ── Share result cache (in-memory, 1-hour TTL) ────────────────────────
+const shareCache = new Map();
+const SHARE_TTL = 60 * 60 * 1000;
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of shareCache) {
+    if (now - val.ts > SHARE_TTL) shareCache.delete(key);
+  }
+}, 10 * 60 * 1000).unref();
+
+// POST /api/share — store scan result, return short key (no quota cost on retrieval)
+app.post('/api/share', (req, res) => {
+  const { result, url } = req.body || {};
+  if (!result || !url || typeof url !== 'string' || url.length > 2048) {
+    return res.status(400).json({ error: 'Invalid payload.' });
+  }
+  if (shareCache.size >= 500) return res.status(503).json({ error: 'Cache full.' });
+  const key = Math.random().toString(36).slice(2, 10);
+  shareCache.set(key, { result, url, ts: Date.now() });
+  res.json({ key });
+});
+
+// GET /api/share/:key — retrieve cached result (no quota cost)
+app.get('/api/share/:key', (req, res) => {
+  const entry = shareCache.get(req.params.key);
+  if (!entry || Date.now() - entry.ts > SHARE_TTL) {
+    return res.status(404).json({ error: 'Not found or expired.' });
+  }
+  res.json({ result: entry.result, url: entry.url });
+});
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`LinkGuard API server running on :${PORT}`));
