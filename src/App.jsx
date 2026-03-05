@@ -155,17 +155,6 @@ function InfoRow({icon,label,value,color,t,mono=true}){
 
 
 
-// ── Tab Button ─────────────────────────────────────────────────────────
-function TabBtn({label,active,onClick,t,dark}){
-  return(
-    <button onClick={onClick} style={{flex:1,padding:"8px 6px",borderRadius:9,border:"none",cursor:"pointer",
-      background:active?t.green:"transparent",color:active?(dark?"#0a0a0f":"#fff"):t.muted,
-      fontFamily:"Syne",fontWeight:700,fontSize:12,transition:"all 0.2s",whiteSpace:"nowrap"}}>
-      {label}
-    </button>
-  );
-}
-
 // ── Bulk Row ───────────────────────────────────────────────────────────
 function BulkRow({item,t}){
   const risk=item.result?getRisk(item.result.malicious,item.result.suspicious,item.result.total):{score:0,label:item.status==="error"?"Error":item.status,color:null};
@@ -209,12 +198,19 @@ export default function App(){
   // ── single scan ──────────────────────────────────────────────────────
   const doScan=useCallback(async(su,silent=false)=>{
     if(!su?.trim()){if(!silent)setError("Enter a URL to scan.");return null;}
+    try{new URL(su.trim());}catch{if(!silent)setError("Enter a valid URL (must start with http:// or https://)");return null;}
     if(!silent){setError(null);setResult(null);setLoading(true);setPhase("submitting");setScannedUrl(su.trim());setTab("Overview");}
     try{
       const fd=new URLSearchParams();fd.append("url",su.trim());
       const r=await fetch("/api/urls",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:fd.toString()});
-      if(!r.ok){const e=await r.json();throw new Error(e?.error?.message||`HTTP ${r.status}`);}
-      const id=(await r.json()).data?.id;
+      if(!r.ok){
+        let msg=`HTTP ${r.status}`;
+        try{const e=await r.json();msg=e?.error?.message||msg;}catch{}
+        if(r.status===429)msg="Daily quota reached — VirusTotal free tier allows 500 requests/day. Try again tomorrow.";
+        throw new Error(msg);
+      }
+      let submitData;try{submitData=await r.json();}catch{throw new Error("Invalid response from server.");}
+      const id=submitData.data?.id;
       if(!id)throw new Error("No analysis ID.");
       if(!silent)setPhase("polling");
       let attempts=0;
@@ -222,7 +218,7 @@ export default function App(){
         const poll=async()=>{
           if(++attempts>24){reject(new Error("Timed out"));return;}
           const pr=await fetch(`/api/analyses/${id}`);
-          const pd=await pr.json();
+          let pd;try{pd=await pr.json();}catch{pollRef.current=setTimeout(poll,3000);return;}
           if(pd.data?.attributes?.status==="completed"){
             const attrs=pd.data.attributes;
             if(!silent){setResult(attrs);setPhase("done");setLoading(false);}
@@ -292,27 +288,55 @@ export default function App(){
       input,textarea{transition:border-color 0.2s;-webkit-appearance:none;}
       input::placeholder,textarea::placeholder{color:${t.muted};}
       @keyframes slide{0%{margin-left:-40%}100%{margin-left:100%}}
-      @keyframes fadein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+      @keyframes fadein{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
       .fadein{animation:fadein 0.35s ease both;}
       .dropzone-active{border-color:${t.green}!important;background:${t.green}0a!important;}
+      .card{width:100%;background:${t.surface};border:1px solid ${t.border};border-radius:clamp(14px,3vw,22px);padding:clamp(14px,4vw,24px);display:flex;flex-direction:column;gap:clamp(10px,3vw,16px);transition:background 0.3s,border-color 0.3s;}
+      .scan-row{display:flex;gap:clamp(6px,2vw,10px);}
+      .url-input{flex:1;min-width:0;padding:clamp(11px,2.5vw,14px) clamp(12px,3vw,16px);border-radius:10px;font-family:'Space Mono',monospace;font-size:clamp(13px,3.5vw,15px);outline:none;width:100%;}
+      .scan-btn{flex-shrink:0;padding:clamp(11px,2.5vw,14px) clamp(16px,4vw,22px);border-radius:10px;border:none;font-family:'Syne',sans-serif;font-weight:700;font-size:clamp(13px,3.5vw,14px);cursor:pointer;white-space:nowrap;transition:all 0.2s;min-height:44px;}
+      .tab-bar{display:flex;gap:3px;border-radius:12px;padding:3px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+      .tab-bar::-webkit-scrollbar{display:none;}
+      .tab-btn{flex:1;min-width:fit-content;padding:clamp(7px,2vw,9px) clamp(6px,2vw,10px);border-radius:9px;border:none;cursor:pointer;font-family:'Syne',sans-serif;font-weight:700;font-size:clamp(11px,3vw,13px);transition:all 0.2s;white-space:nowrap;}
+      .action-btn{font-size:clamp(13px,3.5vw,15px);width:clamp(34px,9vw,38px);height:clamp(34px,9vw,38px);border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:border-color 0.2s;}
+      .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(6px,2vw,10px);}
+      @media(max-width:420px){
+        .scan-row{flex-direction:column;}
+        .scan-btn{width:100%;padding:15px;border-radius:12px;}
+        .url-input{font-size:16px;}
+        .info-grid{grid-template-columns:1fr;}
+      }
     `}</style>
 
-    <div style={{minHeight:"100vh",background:t.bg,display:"flex",flexDirection:"column",alignItems:"center",padding:"24px 14px 60px",transition:"background 0.3s"}}>
+    <div style={{minHeight:"100vh",background:t.bg,display:"flex",flexDirection:"column",alignItems:"center",padding:"clamp(14px,4vw,28px) clamp(10px,4vw,20px) 80px",paddingLeft:"max(clamp(10px,4vw,20px),env(safe-area-inset-left))",paddingRight:"max(clamp(10px,4vw,20px),env(safe-area-inset-right))",transition:"background 0.3s"}}>
 
       {/* ── Header ─────────────────────────────────────────────── */}
-      <div style={{width:"100%",maxWidth:660,display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
+      <div style={{width:"100%",maxWidth:680,display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"clamp(14px,4vw,22px)"}}>
         <div>
-          <h1 style={{fontSize:28,fontWeight:800,letterSpacing:-1,color:t.text}}>Link<span style={{color:t.green}}>Guard</span></h1>
-          <p style={{color:t.muted,fontSize:11,marginTop:1}}>VirusTotal · 70+ engines · Mobile ready</p>
+          <h1 style={{fontSize:"clamp(22px,6vw,30px)",fontWeight:800,letterSpacing:-1,color:t.text}}>Link<span style={{color:t.green}}>Guard</span></h1>
+          <p style={{color:t.muted,fontSize:"clamp(10px,2.5vw,12px)",marginTop:2}}>70+ security engines · Instant scan</p>
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
-          <button onClick={()=>{setBulkMode(b=>!b);setError(null);}} style={{padding:"7px 13px",borderRadius:10,border:`1px solid ${bulkMode?t.green:t.border}`,background:bulkMode?`${t.green}18`:t.surface,color:bulkMode?t.green:t.muted,fontFamily:"Syne",fontWeight:700,fontSize:12,cursor:"pointer"}}>Bulk</button>
-          <button onClick={()=>setDark(d=>!d)} style={{width:38,height:38,borderRadius:10,border:`1px solid ${t.border}`,background:t.surface,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>{dark?"☀️":"🌙"}</button>
+          <button onClick={()=>{setBulkMode(b=>!b);setError(null);}} style={{padding:"9px 14px",borderRadius:10,border:`1px solid ${bulkMode?t.green:t.border}`,background:bulkMode?`${t.green}18`:t.surface,color:bulkMode?t.green:t.muted,fontFamily:"Syne",fontWeight:700,fontSize:13,cursor:"pointer",minHeight:38}}>Bulk</button>
+          <button onClick={()=>setDark(d=>!d)} style={{width:38,height:38,borderRadius:10,border:`1px solid ${t.border}`,background:t.surface,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} title={dark?"Switch to light mode":"Switch to dark mode"}>
+            {dark?(
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                <line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+              </svg>
+            ):(
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+              </svg>
+            )}
+          </button>
         </div>
       </div>
 
       {/* ── Main Card ──────────────────────────────────────────── */}
-      <div style={{width:"100%",maxWidth:660,background:t.surface,border:`1px solid ${t.border}`,borderRadius:20,padding:"20px 16px",display:"flex",flexDirection:"column",gap:14,transition:"background 0.3s,border-color 0.3s"}}>
+      <div className="card" style={{maxWidth:680}}>
 
         {/* API Key section removed — key is stored in .env on the server */}
 
@@ -320,18 +344,19 @@ export default function App(){
         {!bulkMode?(
           <div>
             <label style={{fontSize:9,fontFamily:"Space Mono",color:t.muted,letterSpacing:1.2,display:"block",marginBottom:6,textTransform:"uppercase"}}>URL to Scan</label>
-            <div className={dragOver?"dropzone-active":""} onDragOver={e=>{e.preventDefault();setDragOver(true);}} onDragLeave={()=>setDragOver(false)} onDrop={onDrop}
-              style={{display:"flex",gap:8,padding:dragOver?"8px":"0",borderRadius:12,border:`2px dashed ${dragOver?t.green:"transparent"}`,transition:"all 0.2s"}}>
+            <div className={`scan-row${dragOver?" dropzone-active":""}`} onDragOver={e=>{e.preventDefault();setDragOver(true);}} onDragLeave={()=>setDragOver(false)} onDrop={onDrop}
+              style={{padding:dragOver?"8px":"0",borderRadius:12,border:`2px dashed ${dragOver?t.green:"transparent"}`,transition:"all 0.2s"}}>
               <input type="url" value={url} onChange={e=>setUrl(e.target.value)} onKeyDown={e=>e.key==="Enter"&&!loading&&doScan(url)}
-                placeholder="https://example.com  (or drag & drop a link)"
-                style={{flex:1,padding:"11px 13px",borderRadius:10,background:t.inputBg,border:`1px solid ${t.border}`,color:t.text,fontFamily:"Space Mono",fontSize:12,outline:"none"}}
+                placeholder="https://example.com"
+                className="url-input"
+                style={{background:t.inputBg,border:`1px solid ${t.border}`,color:t.text}}
                 onFocus={e=>e.target.style.borderColor=t.green} onBlur={e=>e.target.style.borderColor=t.border}/>
               <button onClick={result?reset:()=>doScan(url)} disabled={loading}
-                style={{padding:"11px 18px",borderRadius:10,border:"none",background:loading||result?t.border:t.green,color:loading||result?t.muted:dark?"#0a0a0f":"#fff",fontFamily:"Syne",fontWeight:700,fontSize:13,cursor:loading?"not-allowed":"pointer",whiteSpace:"nowrap",transition:"all 0.2s",flexShrink:0}}>
+                className="scan-btn"
+                style={{background:loading||result?t.border:t.green,color:loading||result?t.muted:dark?"#0a0a0f":"#fff",cursor:loading?"not-allowed":"pointer"}}>
                 {loading?"…":result?"Reset":"Scan →"}
               </button>
             </div>
-            <p style={{fontSize:9,color:t.muted,marginTop:4,fontFamily:"Space Mono"}}>Drag & drop a link here · Press Enter to scan</p>
           </div>
         ):(
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
@@ -355,7 +380,7 @@ export default function App(){
         {/* Loading */}
         {loading&&(
           <div style={{padding:16,borderRadius:12,background:t.inputBg,border:`1px solid ${t.border}`,textAlign:"center"}}>
-            <div style={{fontSize:12,fontFamily:"Space Mono",color:t.green,marginBottom:8}}>{phase==="submitting"?"⟳  Submitting to VirusTotal…":"⟳  Engines analyzing… (15–30s)"}</div>
+            <div style={{fontSize:12,fontFamily:"Space Mono",color:t.green,marginBottom:8}}>{phase==="submitting"?"⟳  Submitting…":"⟳  Engines analyzing… (15–30s)"}</div>
             <div style={{height:3,borderRadius:99,background:t.border,overflow:"hidden",margin:"0 auto",maxWidth:220}}>
               <div style={{height:"100%",background:t.green,width:"40%",borderRadius:99,animation:"slide 1.4s ease-in-out infinite"}}/>
             </div>
@@ -370,18 +395,21 @@ export default function App(){
           <div className="fadein" style={{display:"flex",flexDirection:"column",gap:12}}>
 
             {/* URL + action row */}
-            <div style={{display:"flex",alignItems:"center",gap:6,padding:"9px 12px",borderRadius:10,background:t.inputBg,border:`1px solid ${t.border}`,flexWrap:"wrap"}}>
-              <span style={{fontFamily:"Space Mono",fontSize:10,color:t.code,flex:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",minWidth:100}}>{scannedUrl}</span>
+            <div style={{display:"flex",gap:"clamp(4px,2vw,8px)",alignItems:"center",padding:"clamp(8px,2vw,10px) clamp(10px,2.5vw,13px)",borderRadius:10,background:t.inputBg,border:`1px solid ${t.border}`,flexWrap:"wrap"}}>
+              <span style={{fontFamily:"Space Mono",fontSize:"clamp(9px,2.5vw,11px)",color:t.code,flex:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",minWidth:80}}>{scannedUrl}</span>
               {[[copyMsg||"📋",handleCopy],[shareMsg||"🔗",handleShare],["🔁",()=>doScan(scannedUrl)]].map(([lbl,fn],i)=>(
-                <button key={i} onClick={fn} style={{fontSize:13,width:34,height:30,borderRadius:8,border:`1px solid ${t.border}`,background:t.surface,color:t.muted,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}
+                <button key={i} onClick={fn}
+                  className="action-btn"
+                  style={{border:`1px solid ${t.border}`,background:t.surface,color:t.muted}}
                   onMouseEnter={e=>e.currentTarget.style.borderColor=t.green} onMouseLeave={e=>e.currentTarget.style.borderColor=t.border}
                   title={["Copy results","Share link","Re-scan"][i]}>{lbl}</button>
               ))}
             </div>
 
             {/* Tab bar — scrollable on mobile */}
-            <div style={{display:"flex",gap:3,background:t.inputBg,borderRadius:12,padding:3,border:`1px solid ${t.border}`,overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
-              {TABS.map(id=><TabBtn key={id} label={id} active={tab===id} onClick={()=>setTab(id)} t={t} dark={dark}/>)}
+            <div className="tab-bar" style={{background:t.inputBg,border:`1px solid ${t.border}`}}>
+              {TABS.map(id=><button key={id} className="tab-btn" onClick={()=>setTab(id)}
+                style={{background:tab===id?t.green:"transparent",color:tab===id?(dark?"#0a0a0f":"#fff"):t.muted}}>{id}</button>)}
             </div>
 
             {/* ── Overview ──────────────────────────────────── */}
@@ -437,10 +465,10 @@ export default function App(){
                   </div>
                 </div>
                 {/* Stats grid */}
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"clamp(6px,2vw,10px)"}}>
                   {[["🔴 Malicious",mal,t.red],["🟡 Suspicious",sus,t.yellow],["✅ Harmless",har,t.green],["⚪ Undetected",und,t.muted]].map(([lbl,val,color],i)=>(
-                    <div key={i} style={{padding:"12px 14px",borderRadius:12,background:t.inputBg,border:`1px solid ${color}33`,display:"flex",flexDirection:"column",gap:4}}>
-                      <span style={{fontSize:22,fontWeight:800,fontFamily:"Space Mono",color}}>{val}</span>
+                    <div key={i} style={{padding:"clamp(10px,3vw,14px)",borderRadius:12,background:t.inputBg,border:`1px solid ${color}33`,display:"flex",flexDirection:"column",gap:4}}>
+                      <span style={{fontSize:"clamp(18px,5vw,24px)",fontWeight:800,fontFamily:"Space Mono",color}}>{val}</span>
                       <span style={{fontSize:10,color:t.muted,fontFamily:"Space Mono"}}>{lbl}</span>
                       <div style={{height:3,borderRadius:99,background:t.border,marginTop:4}}>
                         <div style={{height:"100%",background:color,borderRadius:99,width:`${tot?Math.round(val/tot*100):0}%`,transition:"width 0.6s"}}/>
@@ -500,7 +528,7 @@ export default function App(){
 
 
       </div>
-      <p style={{marginTop:16,fontSize:9,fontFamily:"Space Mono",color:t.muted,textAlign:"center"}}>Free tier: 500 req/day · 4 req/min · Non-commercial use</p>
+      <p style={{marginTop:16,fontSize:9,fontFamily:"Space Mono",color:t.muted,textAlign:"center"}}>500 scans/day · 4/min · Non-commercial use</p>
     </div>
   </>);
 }

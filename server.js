@@ -1,9 +1,26 @@
 import express from 'express';
 import { config } from 'dotenv';
+import rateLimit from 'express-rate-limit';
+import cors from 'cors';
 
 config();
 
 const app = express();
+
+// CORS — only allow requests from the local Vite frontend (or FRONTEND_ORIGIN in prod)
+const allowedOrigin = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
+app.use(cors({ origin: allowedOrigin }));
+
+// Rate limit — max 10 scan requests per minute per IP to protect the daily quota
+const limiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: { message: 'Too many requests, slow down.' } },
+});
+app.use('/api', limiter);
+
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
@@ -17,9 +34,11 @@ if (!API_KEY) {
 
 // POST /api/urls — submit a URL for scanning
 app.post('/api/urls', async (req, res) => {
+  const url = req.body?.url?.trim();
+  if (!url) return res.status(400).json({ error: { message: 'Missing url field.' } });
   try {
     const body = new URLSearchParams();
-    body.append('url', req.body.url);
+    body.append('url', url);
     const r = await fetch(`${VT_BASE}/urls`, {
       method: 'POST',
       headers: { 'x-apikey': API_KEY, 'Content-Type': 'application/x-www-form-urlencoded' },
