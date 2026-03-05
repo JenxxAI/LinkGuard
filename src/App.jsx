@@ -259,7 +259,7 @@ export default function App(){
   };
 
   // ── share / copy ─────────────────────────────────────────────────────
-  const handleShare=()=>{try{const d=btoa(JSON.stringify({u:scannedUrl}));navigator.clipboard.writeText(`${window.location.href.split("#")[0]}#${d}`);setShareMsg("Copied!");setTimeout(()=>setShareMsg(null),2000);}catch{setShareMsg("Error");}};
+  const handleShare=async()=>{const link=`${window.location.href.split("#")[0]}#${btoa(JSON.stringify({u:scannedUrl}))}`;if(navigator.share){try{await navigator.share({title:`LinkGuard — ${shortUrl(scannedUrl)}`,url:link});}catch(e){if(e?.name!=="AbortError"){navigator.clipboard.writeText(link);setShareMsg("Copied!");setTimeout(()=>setShareMsg(null),2000);}}}else{try{navigator.clipboard.writeText(link);setShareMsg("Copied!");setTimeout(()=>setShareMsg(null),2000);}catch{setShareMsg("Error");}}};
   const handleCopy=()=>{if(!result)return;const s=result.stats||{},m=s.malicious||0,ss=s.suspicious||0,tot=m+ss+(s.harmless||0)+(s.undetected||0),risk=getRisk(m,ss,tot);navigator.clipboard.writeText(`🔍 LinkGuard Scan\n🔗 ${scannedUrl}\n⚠️ Risk: ${risk.label} (${risk.score}/100)\n🔴 Malicious: ${m}  🟡 Suspicious: ${ss}  ✅ Harmless: ${s.harmless||0}\n📊 ${tot} engines checked`);setCopyMsg("Copied!");setTimeout(()=>setCopyMsg(null),2000);};
 
   const reset=()=>{clearTimeout(pollRef.current);setResult(null);setError(null);setLoading(false);setPhase(null);setUrl("");setScannedUrl("");};
@@ -471,7 +471,7 @@ export default function App(){
                   </div>
                 </div>
                 {/* Stats grid */}
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"clamp(6px,2vw,10px)"}}>
+                <div className="info-grid">
                   {[["🔴 Malicious",mal,t.red],["🟡 Suspicious",sus,t.yellow],["✅ Harmless",har,t.green],["⚪ Undetected",und,t.muted]].map(([lbl,val,color],i)=>(
                     <div key={i} style={{padding:"clamp(10px,3vw,14px)",borderRadius:12,background:t.inputBg,border:`1px solid ${color}33`,display:"flex",flexDirection:"column",gap:4}}>
                       <span style={{fontSize:"clamp(18px,5vw,24px)",fontWeight:800,fontFamily:"Space Mono",color}}>{val}</span>
