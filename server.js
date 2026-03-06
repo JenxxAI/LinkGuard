@@ -24,8 +24,6 @@ const limiter = rateLimit({
   legacyHeaders: false,
   message: { error: { message: 'Too many requests, slow down.' } },
 });
-app.use('/api', limiter);
-
 app.use(express.urlencoded({ extended: true, limit: '16kb' }));
 app.use(express.json({ limit: '256kb' }));
 
@@ -38,6 +36,9 @@ app.use((_req, res, next) => {
   next();
 });
 
+// GET /api/health — uptime check for Render / monitoring (exempt from rate limit)
+app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
+
 const VT_BASE = 'https://www.virustotal.com/api/v3';
 const API_KEY = process.env.VT_API_KEY;
 
@@ -46,8 +47,8 @@ if (!API_KEY) {
   process.exit(1);
 }
 
-// GET /api/health — uptime check for Render / monitoring
-app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
+// Apply rate limit only to scan/data routes
+app.use(['/api/urls', '/api/analyses', '/api/expand', '/api/share'], limiter);
 
 // POST /api/urls — submit a URL for scanning
 app.post('/api/urls', async (req, res) => {
