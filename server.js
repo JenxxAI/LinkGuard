@@ -5,6 +5,7 @@ import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { existsSync } from 'fs';
+import ipaddr from 'ipaddr.js';
 
 config();
 
@@ -96,7 +97,24 @@ app.get('/api/analyses/:id', async (req, res) => {
 
 // GET /api/expand?url=... — follow redirects to reveal where short URLs lead
 // SSRF protection: only allow http/https to public addresses
-const PRIVATE_IP_RE = /^(127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.|::1|localhost)/i;
+const PRIVATE_RANGES = new Set([
+  'private',
+  'loopback',
+  'linkLocal',
+  'uniqueLocal',
+  'unspecified',
+  'broadcast',
+  'multicast',
+  'reserved',
+]);
+
+function isPrivateHostname(hostname) {
+  const normalized = hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  if (normalized === 'localhost' || normalized.endsWith('.localhost')) return true;
+  if (!ipaddr.isValid(normalized)) return false;
+  return PRIVATE_RANGES.has(ipaddr.parse(normalized).range());
+}
+
 app.get('/api/expand', async (req, res) => {
   const url = req.query.url?.trim();
   if (!url) return res.status(400).json({ error: 'Missing url' });
@@ -105,7 +123,7 @@ app.get('/api/expand', async (req, res) => {
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     return res.status(400).json({ error: 'Only http/https URLs are supported.' });
   }
-  if (PRIVATE_IP_RE.test(parsed.hostname)) {
+  if (isPrivateHostname(parsed.hostname)) {
     return res.status(400).json({ error: 'Private/internal addresses are not allowed.' });
   }
   try {
@@ -118,7 +136,7 @@ app.get('/api/expand', async (req, res) => {
     // Guard against redirects that land on private/internal addresses
     try {
       const finalHostname = new URL(r.url).hostname;
-      if (PRIVATE_IP_RE.test(finalHostname)) return res.json({ resolved: url });
+      if (isPrivateHostname(finalHostname)) return res.json({ resolved: url });
     } catch {}
     res.json({ resolved: r.url });
   } catch {
@@ -171,5 +189,9 @@ if (existsSync(DIST)) {
   app.get('*', (_req, res) => res.sendFile(join(DIST, 'index.html')));
 }
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`LinkGuard API server running on :${PORT}`));
+export { app };
+
+if (process.env.NODE_ENV !== 'test') {
+  const PORT = process.env.PORT || 3001;
+  app.listen(PORT, () => console.log(`LinkGuard API server running on :${PORT}`));
+}
