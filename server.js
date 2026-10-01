@@ -107,6 +107,8 @@ const PRIVATE_RANGES = new Set([
   'multicast',
   'reserved',
 ]);
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+const MAX_REDIRECTS = 5;
 
 function isPrivateHostname(hostname) {
   const normalized = hostname.replace(/^\[|\]$/g, '').toLowerCase();
@@ -127,18 +129,34 @@ app.get('/api/expand', async (req, res) => {
     return res.status(400).json({ error: 'Private/internal addresses are not allowed.' });
   }
   try {
-    const r = await fetch(url, {
-      method: 'HEAD',
-      redirect: 'follow',
-      signal: AbortSignal.timeout(5000),
-      headers: { 'User-Agent': 'LinkGuard/1.0' },
-    });
-    // Guard against redirects that land on private/internal addresses
-    try {
-      const finalHostname = new URL(r.url).hostname;
-      if (isPrivateHostname(finalHostname)) return res.json({ resolved: url });
-    } catch {}
-    res.json({ resolved: r.url });
+    let currentUrl = url;
+    let redirects = 0;
+
+    while (true) {
+      const r = await fetch(currentUrl, {
+        method: 'HEAD',
+        redirect: 'manual',
+        signal: AbortSignal.timeout(5000),
+        headers: { 'User-Agent': 'LinkGuard/1.0' },
+      });
+      const location = r.headers?.get('location');
+
+      if (!REDIRECT_STATUSES.has(r.status) || !location) {
+        return res.json({ resolved: currentUrl });
+      }
+      if (redirects >= MAX_REDIRECTS) {
+        return res.json({ resolved: currentUrl });
+      }
+
+      let nextUrl;
+      try { nextUrl = new URL(location, currentUrl); } catch { return res.json({ resolved: url }); }
+      if ((nextUrl.protocol !== 'http:' && nextUrl.protocol !== 'https:') || isPrivateHostname(nextUrl.hostname)) {
+        return res.json({ resolved: url });
+      }
+
+      currentUrl = nextUrl.href;
+      redirects += 1;
+    }
   } catch {
     res.json({ resolved: url });
   }
