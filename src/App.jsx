@@ -15,6 +15,13 @@ function getRisk(m,s,tot){
 }
 function shortUrl(u){try{const x=new URL(u);return x.hostname+(x.pathname.length>1?x.pathname.slice(0,20)+(x.pathname.length>20?"…":""):"");}catch{return u.slice(0,35)+(u.length>35?"…":"");}}const SHORT_DOMAINS=new Set(['bit.ly','t.co','tinyurl.com','ow.ly','rb.gy','is.gd','cutt.ly','buff.ly','short.io','shorturl.at','tiny.cc','lnkd.in']);
 function isShortUrl(u){try{return SHORT_DOMAINS.has(new URL(u).hostname);}catch{return false;}}
+function getInitialTheme(){
+  try{
+    const saved=localStorage.getItem('lg_theme');
+    if(saved==='dark'||saved==='light')return saved==='dark';
+  }catch{}
+  return window.matchMedia?.('(prefers-color-scheme:dark)').matches??true;
+}
 // ── Radar Chart (SVG, no deps) ──────────────────────────────────────────
 function RadarChart({mal,sus,har,und,t}){
   const tot=mal+sus+har+und||1;
@@ -185,7 +192,7 @@ function BulkRow({item,t}){
 //  MAIN APP
 // ═══════════════════════════════════════════════════════════════════════
 export default function App(){
-  const [dark,setDark]=useState(()=>window.matchMedia?.('(prefers-color-scheme:dark)').matches??true);
+  const [dark,setDark]=useState(getInitialTheme);
   const t=dark?DARK:LIGHT;
   const [url,setUrl]=useState("");
   const [loading,setLoading]=useState(false);
@@ -224,6 +231,33 @@ export default function App(){
   const [showAbout,setShowAbout]=useState(false);
   const [fromCache,setFromCache]=useState(false);
   const qrInputRef=useRef(null);
+
+  useEffect(()=>{
+    const media=window.matchMedia?.('(prefers-color-scheme:dark)');
+    const followSystem=()=>{
+      try{if(localStorage.getItem('lg_theme'))return;}catch{}
+      setDark(media?.matches??true);
+    };
+    const syncTheme=e=>{
+      if(e.key!=='lg_theme')return;
+      if(e.newValue==='dark'||e.newValue==='light')setDark(e.newValue==='dark');
+      else setDark(media?.matches??true);
+    };
+    if(media?.addEventListener)media.addEventListener('change',followSystem);
+    else media?.addListener?.(followSystem);
+    window.addEventListener('storage',syncTheme);
+    return()=>{
+      if(media?.removeEventListener)media.removeEventListener('change',followSystem);
+      else media?.removeListener?.(followSystem);
+      window.removeEventListener('storage',syncTheme);
+    };
+  },[]);
+
+  const toggleTheme=()=>{
+    const next=!dark;
+    setDark(next);
+    try{localStorage.setItem('lg_theme',next?'dark':'light');}catch{}
+  };
 
   // ── expand short URLs ────────────────────────────────────────────────
   useEffect(()=>{
@@ -451,7 +485,7 @@ export default function App(){
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
           <button onClick={()=>{setBulkMode(b=>!b);setError(null);}} style={{padding:"9px 14px",borderRadius:10,border:`1px solid ${bulkMode?t.green:t.border}`,background:bulkMode?`${t.green}18`:t.surface,color:bulkMode?t.green:t.muted,fontFamily:"Plus Jakarta Sans",fontWeight:700,fontSize:13,cursor:"pointer",minHeight:38}}>Bulk</button>
-          <button onClick={()=>setDark(d=>!d)} style={{width:38,height:38,borderRadius:10,border:`1px solid ${t.border}`,background:t.surface,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} title={dark?"Switch to light mode":"Switch to dark mode"}>
+          <button onClick={toggleTheme} style={{width:38,height:38,borderRadius:10,border:`1px solid ${t.border}`,background:t.surface,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} title={dark?"Switch to light mode":"Switch to dark mode"}>
             {dark?(
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/>
