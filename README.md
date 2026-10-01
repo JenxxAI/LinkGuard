@@ -19,6 +19,7 @@ npm run dev                   # starts both Vite (5173) and Express (3001)
 | Variable | Required | Description |
 |---|---|---|
 | `VT_API_KEY` | Yes | Threat intelligence API key |
+| `GOOGLE_WEBRISK_API_KEY` | No | Optional fallback when VirusTotal is rate-limited or temporarily unavailable |
 | `FRONTEND_ORIGIN` | Prod only | Your deployed frontend URL (sets CORS) |
 
 ## Features
@@ -35,6 +36,7 @@ npm run dev                   # starts both Vite (5173) and Express (3001)
 
 ## Security notes
 - API key is never exposed to the frontend
+- Optional Google Web Risk fallback handles VirusTotal quota or temporary outages
 - SSRF protection on `/api/expand` (blocks private IPs, non-http(s) schemes)
 - Rate limited: 10 req/min per IP
 - Security headers: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`

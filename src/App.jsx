@@ -269,7 +269,7 @@ export default function App(){
       if(!r.ok){
         let msg=`HTTP ${r.status}`;
         try{const e=await r.json();msg=e?.error?.message||msg;}catch{}
-        if(r.status===429)msg="Scan limit reached — our analysis engine allows a limited number of requests per day. Please try again later.";
+        if(r.status===429)msg="Scan limit reached — our analysis providers are temporarily unavailable. Please try again later.";
         throw new Error(msg);
       }
       let submitData;try{submitData=await r.json();}catch{throw new Error("Invalid response from server.");}
@@ -633,7 +633,7 @@ export default function App(){
                   <RiskGauge score={risk.score} label={risk.label} colorKey={risk.color} t={t}/>
                   <div style={{flex:1,minWidth:160}}>
                     <div style={{fontSize:17,fontWeight:800,color:rc,letterSpacing:-0.5}}>{mal===0&&sus===0?"✓ No threats detected":`⚠ ${mal+sus} engine${mal+sus>1?"s":""} flagged`}</div>
-                    <div style={{fontSize:11,color:t.muted,marginTop:5,fontFamily:"JetBrains Mono"}}>{tot} engines · {lastAnalysisDate||"just now"}</div>
+                    <div style={{fontSize:11,color:t.muted,marginTop:5,fontFamily:"JetBrains Mono"}}>{tot} engine{tot===1?"":"s"} · {result.provider||"VirusTotal"} · {lastAnalysisDate||"just now"}</div>
                     {(mal>0||sus>0)&&(
                       <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
                         {mal>0&&<span style={{padding:"3px 10px",borderRadius:99,fontSize:10,fontFamily:"JetBrains Mono",fontWeight:700,background:`${t.red}18`,color:t.red,border:`1px solid ${t.red}33`}}>{mal} malicious</span>}

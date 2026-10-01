@@ -5,6 +5,7 @@ import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { existsSync } from 'fs';
+import { randomUUID } from 'crypto';
 import ipaddr from 'ipaddr.js';
 
 config();
@@ -42,6 +43,10 @@ app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 
 const VT_BASE = 'https://www.virustotal.com/api/v3';
 const API_KEY = process.env.VT_API_KEY;
+const WEBRISK_API_KEY = process.env.GOOGLE_WEBRISK_API_KEY;
+const WEBRISK_BASE = 'https://webrisk.googleapis.com/v1/uris:search';
+const FALLBACK_TTL = 10 * 60 * 1000;
+const fallbackAnalyses = new Map();
 
 if (!API_KEY) {
   console.error('ERROR: VT_API_KEY is not set in .env');
@@ -51,30 +56,73 @@ if (!API_KEY) {
 // Apply rate limit only to scan/data routes
 app.use(['/api/urls', '/api/analyses', '/api/expand', '/api/share'], limiter);
 
+async function scanWithWebRisk(url) {
+  if (!WEBRISK_API_KEY) return null;
+  const endpoint = new URL(WEBRISK_BASE);
+  endpoint.searchParams.set('threatTypes', 'MALWARE');
+  endpoint.searchParams.append('threatTypes', 'SOCIAL_ENGINEERING');
+  endpoint.searchParams.append('threatTypes', 'UNWANTED_SOFTWARE');
+  endpoint.searchParams.set('uri', url);
+  endpoint.searchParams.set('key', WEBRISK_API_KEY);
+
+  const response = await fetch(endpoint, { signal: AbortSignal.timeout(10000) });
+  if (!response.ok) return null;
+  const data = await response.json();
+  const threatTypes = data.threat?.threatTypes || [];
+  const malicious = threatTypes.length ? 1 : 0;
+  const id = `webrisk_${randomUUID().replaceAll('-', '')}`;
+  const attributes = {
+    date: Math.floor(Date.now() / 1000),
+    status: 'completed',
+    provider: 'Google Web Risk',
+    stats: { malicious, suspicious: 0, harmless: malicious ? 0 : 1, undetected: 0 },
+    results: {
+      'Google Web Risk': {
+        category: malicious ? 'malicious' : 'harmless',
+        result: threatTypes.join(', ') || null,
+      },
+    },
+    url,
+  };
+  fallbackAnalyses.set(id, { data: { type: 'analysis', id, attributes }, ts: Date.now() });
+  return { data: { type: 'analysis', id } };
+}
+
+async function tryFallback(url) {
+  try { return await scanWithWebRisk(url); } catch { return null; }
+}
+
 // POST /api/urls — submit a URL for scanning
 app.post('/api/urls', async (req, res) => {
   const url = req.body?.url?.trim();
   if (!url) return res.status(400).json({ error: { message: 'Missing url field.' } });
+  let r;
   try {
     const body = new URLSearchParams();
     body.append('url', url);
-    const r = await fetch(`${VT_BASE}/urls`, {
+    r = await fetch(`${VT_BASE}/urls`, {
       method: 'POST',
       headers: { 'x-apikey': API_KEY, 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString(),
       signal: AbortSignal.timeout(10000),
     });
-    const data = await r.json();
-    if (!r.ok) {
-      const msg = r.status === 429
-        ? 'Scan limit reached — our analysis engine allows a limited number of requests per day. Please try again later.'
-        : `Analysis service returned an error (HTTP ${r.status}).`;
-      return res.status(r.status).json({ error: { message: msg } });
-    }
-    res.status(r.status).json(data);
   } catch (e) {
-    res.status(500).json({ error: { message: e.message } });
+    const fallback = await tryFallback(url);
+    if (fallback) return res.status(202).json(fallback);
+    return res.status(502).json({ error: { message: 'Analysis services are temporarily unavailable.' } });
   }
+  const data = await r.json();
+  if (!r.ok) {
+    if ([429, 502, 503, 504].includes(r.status)) {
+      const fallback = await tryFallback(url);
+      if (fallback) return res.status(202).json(fallback);
+    }
+    const msg = r.status === 429
+      ? 'Scan limit reached — our analysis providers are temporarily unavailable. Please try again later.'
+      : `Analysis service returned an error (HTTP ${r.status}).`;
+    return res.status(r.status).json({ error: { message: msg } });
+  }
+  res.status(r.status).json(data);
 });
 
 // GET /api/analyses/:id — poll analysis result
@@ -83,6 +131,9 @@ app.get('/api/analyses/:id', async (req, res) => {
   if (!/^[A-Za-z0-9_=-]{8,128}$/.test(req.params.id)) {
     return res.status(400).json({ error: { message: 'Invalid analysis ID.' } });
   }
+  const fallback = fallbackAnalyses.get(req.params.id);
+  if (fallback && Date.now() - fallback.ts <= FALLBACK_TTL) return res.json(fallback.data);
+  if (fallback) fallbackAnalyses.delete(req.params.id);
   try {
     const r = await fetch(`${VT_BASE}/analyses/${req.params.id}`, {
       headers: { 'x-apikey': API_KEY },
@@ -151,6 +202,9 @@ setInterval(() => {
   const now = Date.now();
   for (const [key, val] of shareCache) {
     if (now - val.ts > SHARE_TTL) shareCache.delete(key);
+  }
+  for (const [key, val] of fallbackAnalyses) {
+    if (now - val.ts > FALLBACK_TTL) fallbackAnalyses.delete(key);
   }
 }, 10 * 60 * 1000).unref();
 

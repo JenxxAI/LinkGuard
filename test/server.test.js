@@ -3,6 +3,7 @@ import request from 'supertest';
 
 process.env.NODE_ENV = 'test';
 process.env.VT_API_KEY = 'test-api-key';
+process.env.GOOGLE_WEBRISK_API_KEY = 'test-webrisk-key';
 
 const { app } = await import('../server.js');
 
@@ -52,20 +53,26 @@ describe('POST /api/urls', () => {
   });
 
   it('maps an upstream VirusTotal failure to the documented error response', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(
-      JSON.stringify({ error: { message: 'quota exceeded' } }),
-      { status: 429, headers: { 'content-type': 'application/json' } },
-    )));
+    const upstream = vi.fn()
+      .mockResolvedValueOnce(new Response(
+        JSON.stringify({ error: { message: 'quota exceeded' } }),
+        { status: 429, headers: { 'content-type': 'application/json' } },
+      ))
+      .mockResolvedValueOnce(new Response(
+        JSON.stringify({}),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ));
+    vi.stubGlobal('fetch', upstream);
 
     const response = await request(app)
       .post('/api/urls')
       .type('form')
       .send({ url: 'https://example.com' });
 
-    expect(response.status).toBe(429);
-    expect(response.body).toEqual({
-      error: { message: expect.stringContaining('Scan limit reached') },
-    });
+    expect(response.status).toBe(202);
+    expect(response.body.data.id).toMatch(/^webrisk_[A-Za-z0-9]+$/);
+    expect(upstream).toHaveBeenCalledTimes(2);
+    expect(upstream.mock.calls[1][0].toString()).toContain('webrisk.googleapis.com');
   });
 });
 
