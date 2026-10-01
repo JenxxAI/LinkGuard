@@ -97,26 +97,19 @@ app.get('/api/analyses/:id', async (req, res) => {
 
 // GET /api/expand?url=... — follow redirects to reveal where short URLs lead
 // SSRF protection: only allow http/https to public addresses
-const PRIVATE_RANGES = new Set([
-  'private',
-  'loopback',
-  'linkLocal',
-  'uniqueLocal',
-  'unspecified',
-  'broadcast',
-  'multicast',
-  'reserved',
-]);
+const MAX_REDIRECTS = 5;
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
 function isPrivateHostname(hostname) {
-  const normalized = hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  const normalized = hostname.replace(/^\[|\]$/g, '').toLowerCase().replace(/\.$/, '');
   if (normalized === 'localhost' || normalized.endsWith('.localhost')) return true;
   if (!ipaddr.isValid(normalized)) return false;
-  return PRIVATE_RANGES.has(ipaddr.parse(normalized).range());
+  // Normalize IPv4-mapped IPv6 before checking; only global unicast is allowed.
+  return ipaddr.process(normalized).range() !== 'unicast';
 }
 
 app.get('/api/expand', async (req, res) => {
-  const url = req.query.url?.trim();
+  const url = typeof req.query.url === 'string' ? req.query.url.trim() : '';
   if (!url) return res.status(400).json({ error: 'Missing url' });
   let parsed;
   try { parsed = new URL(url); } catch { return res.status(400).json({ error: 'Invalid URL' }); }
@@ -127,18 +120,26 @@ app.get('/api/expand', async (req, res) => {
     return res.status(400).json({ error: 'Private/internal addresses are not allowed.' });
   }
   try {
-    const r = await fetch(url, {
-      method: 'HEAD',
-      redirect: 'follow',
-      signal: AbortSignal.timeout(5000),
-      headers: { 'User-Agent': 'LinkGuard/1.0' },
-    });
-    // Guard against redirects that land on private/internal addresses
-    try {
-      const finalHostname = new URL(r.url).hostname;
-      if (isPrivateHostname(finalHostname)) return res.json({ resolved: url });
-    } catch {}
-    res.json({ resolved: r.url });
+    const signal = AbortSignal.timeout(5000);
+    for (let hops = 0; ; hops++) {
+      const r = await fetch(parsed.href, {
+        method: 'HEAD',
+        redirect: 'manual',
+        signal,
+        headers: { 'User-Agent': 'LinkGuard/1.0' },
+      });
+      const location = r.headers.get('location');
+      await r.body?.cancel();
+      if (!REDIRECT_STATUSES.has(r.status) || !location) {
+        return res.json({ resolved: parsed.href });
+      }
+      if (hops >= MAX_REDIRECTS) return res.json({ resolved: url });
+      const next = new URL(location, parsed);
+      if (!['http:', 'https:'].includes(next.protocol) || isPrivateHostname(next.hostname)) {
+        return res.json({ resolved: url });
+      }
+      parsed = next;
+    }
   } catch {
     res.json({ resolved: url });
   }
