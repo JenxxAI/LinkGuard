@@ -71,8 +71,8 @@ function RiskGauge({score,label,colorKey,t}){
   useEffect(()=>{
     if(!score){setDisp(0);return;}
     let start=null;const dur=900;
-    const step=ts=>{if(!start)start=ts;const p=Math.min((ts-start)/dur,1);setDisp(Math.round(p*score));if(p<1)requestAnimationFrame(step);};
-    const raf=requestAnimationFrame(step);
+    const step=ts=>{if(!start)start=ts;const p=Math.min((ts-start)/dur,1);setDisp(Math.round(p*score));if(p<1)raf=requestAnimationFrame(step);};
+    let raf=requestAnimationFrame(step);
     return()=>cancelAnimationFrame(raf);
   },[score]);
   const angle=-135+(disp/100)*270,color=t[colorKey]||t.muted;
@@ -184,8 +184,33 @@ function BulkRow({item,t}){
 // ═══════════════════════════════════════════════════════════════════════
 //  MAIN APP
 // ═══════════════════════════════════════════════════════════════════════
+function abortableDelay(ms,signal){
+  return new Promise((resolve,reject)=>{
+    if(signal.aborted){reject(signal.reason);return;}
+    const onAbort=()=>{clearTimeout(timer);reject(signal.reason);};
+    const timer=setTimeout(()=>{signal.removeEventListener('abort',onAbort);resolve();},ms);
+    signal.addEventListener('abort',onAbort,{once:true});
+  });
+}
+
 export default function App(){
-  const [dark,setDark]=useState(()=>window.matchMedia?.('(prefers-color-scheme:dark)').matches??true);
+  const [theme,setTheme]=useState(()=>{
+    try{const saved=localStorage.getItem('lg_theme');if(saved==='dark'||saved==='light')return saved;}catch{}
+    return null;
+  });
+  const [systemDark,setSystemDark]=useState(()=>window.matchMedia?.('(prefers-color-scheme: dark)').matches??true);
+  useEffect(()=>{
+    const media=window.matchMedia?.('(prefers-color-scheme: dark)');
+    if(!media)return;
+    const update=()=>setSystemDark(media.matches);
+    update();media.addEventListener('change',update);
+    return()=>media.removeEventListener('change',update);
+  },[]);
+  const dark=theme?theme==='dark':systemDark;
+  const toggleTheme=()=>{
+    const next=dark?'light':'dark';setTheme(next);
+    try{localStorage.setItem('lg_theme',next);}catch{}
+  };
   const t=dark?DARK:LIGHT;
   const [url,setUrl]=useState("");
   const [loading,setLoading]=useState(false);
@@ -201,10 +226,23 @@ export default function App(){
   const [bulkResults,setBulkResults]=useState([]);
   const [bulkRunning,setBulkRunning]=useState(false);
   const [dragOver,setDragOver]=useState(false);
-  const pollRef=useRef(null);
+  const scanRef=useRef(null);
+  const bulkRef=useRef(null);
+  const qrRef=useRef(null);
+  const timersRef=useRef(new Set());
+  const later=(fn,ms)=>{
+    const timer=setTimeout(()=>{timersRef.current.delete(timer);if(mountedRef.current)fn();},ms);
+    timersRef.current.add(timer);
+  };
   const mountedRef=useRef(true);
-  useEffect(()=>()=>{mountedRef.current=false;},[]);
-  const bulkCancelRef=useRef(false);
+  useEffect(()=>{
+    mountedRef.current=true;
+    return()=>{
+      mountedRef.current=false;
+      scanRef.current?.abort();bulkRef.current?.abort();qrRef.current?.abort();
+      timersRef.current.forEach(clearTimeout);timersRef.current.clear();
+    };
+  },[]);
   const touchStartX=useRef(null);
   const [history,setHistory]=useState(()=>{try{return JSON.parse(localStorage.getItem('lg_history')||'[]');}catch{return[];}});
   const [expanded,setExpanded]=useState(null);
@@ -222,8 +260,8 @@ export default function App(){
     setExpandLoading(true);setExpanded(null);
     fetch(`/api/expand?url=${encodeURIComponent(url)}`,{signal:ctrl.signal})
       .then(r=>r.json())
-      .then(d=>{if(d.resolved&&d.resolved!==url)setExpanded(d.resolved);setExpandLoading(false);})
-      .catch(()=>setExpandLoading(false));
+      .then(d=>{if(ctrl.signal.aborted)return;if(d.resolved&&d.resolved!==url)setExpanded(d.resolved);setExpandLoading(false);})
+      .catch(()=>{if(!ctrl.signal.aborted)setExpandLoading(false);});
     return()=>ctrl.abort();
   },[url]);
 
@@ -231,18 +269,29 @@ export default function App(){
   const handleQR=()=>qrInputRef.current?.click();
   const onQRFile=async e=>{
     const file=e.target.files?.[0];if(!file)return;e.target.value='';
+    qrRef.current?.abort();
+    const ctrl=new AbortController();qrRef.current=ctrl;
+    let bitmap;
+    let found;
     try{
       const bd=new window.BarcodeDetector({formats:['qr_code']});
-      const bmp=await createImageBitmap(file);
-      const codes=await bd.detect(bmp);
-      const found=codes.find(c=>c.rawValue?.startsWith('http'))?.rawValue;
-      if(found){setUrl(found);setTimeout(()=>doScan(found),50);}
-      else setError('No URL found in QR code.');
-    }catch{setError('QR scanning is not supported in this browser.');}
+      bitmap=await createImageBitmap(file);
+      if(ctrl.signal.aborted)return;
+      const codes=await bd.detect(bitmap);
+      if(ctrl.signal.aborted)return;
+      found=codes.find(c=>/^https?:\/\//i.test(c.rawValue))?.rawValue;
+      if(!found)setError('No URL found in QR code.');
+    }catch{if(!ctrl.signal.aborted)setError('QR scanning is not supported in this browser.');}
+    finally{bitmap?.close();}
+    if(found&&!ctrl.signal.aborted){setUrl(found);await startScan(found);}
   };
 
   // ── single scan ──────────────────────────────────────────────────────
   const doScan=useCallback(async(su,silent=false)=>{
+    scanRef.current?.abort();qrRef.current?.abort();
+    const ctrl=new AbortController();scanRef.current=ctrl;
+    const {signal}=ctrl;
+    if(!silent){bulkRef.current?.abort();setBulkRunning(false);setLoading(false);setPhase(null);}
     if(!su?.trim()){if(!silent)setError("Enter a URL to scan.");return null;}
     let _parsed;
     try{_parsed=new URL(su.trim());}catch{if(!silent)setError("Enter a valid URL (must start with http:// or https://)");return null;}
@@ -265,7 +314,7 @@ export default function App(){
     if(!silent){setError(null);setResult(null);setLoading(true);setPhase("submitting");setScannedUrl(su.trim());setTab("Overview");}
     try{
       const fd=new URLSearchParams();fd.append("url",su.trim());
-      const r=await fetch("/api/urls",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:fd.toString()});
+      const r=await fetch("/api/urls",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:fd.toString(),signal});
       if(!r.ok){
         let msg=`HTTP ${r.status}`;
         try{const e=await r.json();msg=e?.error?.message||msg;}catch{}
@@ -275,51 +324,62 @@ export default function App(){
       let submitData;try{submitData=await r.json();}catch{throw new Error("Invalid response from server.");}
       const id=submitData.data?.id;
       if(!id)throw new Error("No analysis ID.");
+      signal.throwIfAborted();
       if(!silent)setPhase("polling");
-      let attempts=0;
-      return await new Promise((resolve,reject)=>{
-        const poll=async()=>{
-          if(++attempts>24){reject(new Error("Timed out"));return;}
-          const pr=await fetch(`/api/analyses/${id}`);
-          let pd;try{pd=await pr.json();}catch{pollRef.current=setTimeout(poll,3000);return;}
-          if(pd.data?.attributes?.status==="completed"){
-            const attrs=pd.data.attributes;
-            if(!silent&&mountedRef.current){setResult(attrs);setPhase("done");setLoading(false);navigator.vibrate?.(100);}
-            const s=attrs?.stats||{},m=s.malicious||0,ss=s.suspicious||0,h=s.harmless||0,u=s.undetected||0,tot=m+ss+h+u+(s.timeout||0);
-            const rk=getRisk(m,ss,tot);
-            setHistory(prev=>{const entry={url:su.trim(),label:rk.label,color:rk.color,score:rk.score,date:Date.now()};const next=[entry,...prev.filter(x=>x.url!==su.trim())].slice(0,20);try{localStorage.setItem('lg_history',JSON.stringify(next));}catch{}return next;});
-            if(!silent)document.title=`${m>0||ss>0?'⚠':'✓'} ${rk.label} — LinkGuard`;
-            try{localStorage.setItem('lg_rslt_'+su.trim(),JSON.stringify({attrs,ts:Date.now()}));}catch{}
-            if(!silent)setFromCache(false);
-            resolve({malicious:m,suspicious:ss,harmless:h,undetected:u,total:tot,attrs});
-          }else{pollRef.current=setTimeout(poll,3000);}
-        };poll();
-      });
+      for(let attempts=0;attempts<24;attempts++){
+        signal.throwIfAborted();
+        const pr=await fetch(`/api/analyses/${id}`,{signal});
+        if(!pr.ok)throw new Error(`Analysis request failed (HTTP ${pr.status}).`);
+        const pd=await pr.json();
+        signal.throwIfAborted();
+        if(pd.data?.attributes?.status==="completed"){
+          const attrs=pd.data.attributes;
+          if(!silent){setResult(attrs);setPhase("done");setLoading(false);navigator.vibrate?.(100);}
+          const s=attrs?.stats||{},m=s.malicious||0,ss=s.suspicious||0,h=s.harmless||0,u=s.undetected||0,tot=m+ss+h+u+(s.timeout||0);
+          const rk=getRisk(m,ss,tot);
+          setHistory(prev=>{const entry={url:su.trim(),label:rk.label,color:rk.color,score:rk.score,date:Date.now()};const next=[entry,...prev.filter(x=>x.url!==su.trim())].slice(0,20);try{localStorage.setItem('lg_history',JSON.stringify(next));}catch{}return next;});
+          if(!silent)document.title=`${m>0||ss>0?'⚠':'✓'} ${rk.label} — LinkGuard`;
+          try{localStorage.setItem('lg_rslt_'+su.trim(),JSON.stringify({attrs,ts:Date.now()}));}catch{}
+          if(!silent)setFromCache(false);
+          return {malicious:m,suspicious:ss,harmless:h,undetected:u,total:tot,attrs};
+        }
+        if(attempts<23)await abortableDelay(3000,signal);
+      }
+      throw new Error("Timed out");
     }catch(e){
-      if(!silent){setError(e.message||"Error occurred.");setLoading(false);setPhase(null);setFromCache(false);}
+      if(!silent&&!signal.aborted){setError(e.message||"Error occurred.");setLoading(false);setPhase(null);setFromCache(false);}
       throw e;
     }
   },[]);
 
+  // UI entry points consume errors already displayed by doScan.
+  const startScan=useCallback(async su=>{try{await doScan(su);}catch{}},[doScan]);
+
   // ── bulk scan ────────────────────────────────────────────────────────
   const runBulk=async()=>{
+    bulkRef.current?.abort();scanRef.current?.abort();qrRef.current?.abort();
+    setBulkRunning(false);
+    const ctrl=new AbortController();bulkRef.current=ctrl;
     const urls=bulkText.split(/\n|,/).map(x=>x.trim()).filter(x=>x.startsWith("http"));
     if(!urls.length){setError("No valid URLs found (must start with http).");return;}
-    bulkCancelRef.current=false;
+    setLoading(false);setPhase(null);
     setError(null);setBulkResults(urls.map(u=>({url:u,status:"queued",result:null})));setBulkRunning(true);
-    for(let i=0;i<urls.length;i++){
-      if(bulkCancelRef.current)break;
-      setBulkResults(prev=>prev.map((x,j)=>j===i?{...x,status:"scanning"}:x));
-      if(i>0){await new Promise(res=>{let e=0;const tk=setInterval(()=>{e+=300;if(e>=15500||bulkCancelRef.current){clearInterval(tk);res();}},300);});}
-      if(bulkCancelRef.current)break;
-      try{
-        const res=await doScan(urls[i],true);
-        setBulkResults(prev=>prev.map((x,j)=>j===i?{...x,status:"done",result:res}:x));
-      }catch(e){
-        setBulkResults(prev=>prev.map((x,j)=>j===i?{...x,status:"error",result:null}:x));
+    try{
+      for(let i=0;i<urls.length;i++){
+        if(i>0)await abortableDelay(15500,ctrl.signal);
+        ctrl.signal.throwIfAborted();
+        setBulkResults(prev=>prev.map((x,j)=>j===i?{...x,status:"scanning"}:x));
+        try{
+          const res=await doScan(urls[i],true);
+          ctrl.signal.throwIfAborted();
+          setBulkResults(prev=>prev.map((x,j)=>j===i?{...x,status:"done",result:res}:x));
+        }catch(e){
+          if(ctrl.signal.aborted||e.name==='AbortError')throw e;
+          setBulkResults(prev=>prev.map((x,j)=>j===i?{...x,status:"error",result:null}:x));
+        }
       }
-    }
-    setBulkRunning(false);
+    }catch(e){if(!ctrl.signal.aborted&&e.name!=='AbortError')setError(e.message);}
+    finally{if(mountedRef.current&&bulkRef.current===ctrl)setBulkRunning(false);}
   };
 
   // ── drag & drop ──────────────────────────────────────────────────────
@@ -330,15 +390,30 @@ export default function App(){
   };
 
   // ── share / copy ─────────────────────────────────────────────────────
+  const copyText=async(text,setMessage,success="Copied!")=>{
+    try{
+      await navigator.clipboard.writeText(text);
+      if(mountedRef.current){setMessage(success);later(()=>setMessage(null),2000);}
+    }catch{if(mountedRef.current)setMessage("Copy failed");}
+  };
   const handleShare=async()=>{
     let link=window.location.href.split("?")[0].split("#")[0];
     try{const sr=await fetch('/api/share',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({result,url:scannedUrl})});const sd=await sr.json();if(sd.key)link+=`?r=${sd.key}`;}catch{}
-    if(navigator.share){try{await navigator.share({title:`LinkGuard — ${shortUrl(scannedUrl)}`,url:link});}catch(e){if(e?.name!=="AbortError"){navigator.clipboard.writeText(link);setShareMsg("Copied!");setTimeout(()=>setShareMsg(null),2000);}}}else{try{navigator.clipboard.writeText(link);setShareMsg("Copied!");setTimeout(()=>setShareMsg(null),2000);}catch{setShareMsg("Error");}}
+    if(!mountedRef.current)return;
+    if(navigator.share){
+      try{await navigator.share({title:`LinkGuard — ${shortUrl(scannedUrl)}`,url:link});return;}
+      catch(e){if(e?.name==="AbortError")return;}
+    }
+    await copyText(link,setShareMsg);
   };
-  const handleCopy=()=>{if(!result)return;const s=result.stats||{},m=s.malicious||0,ss=s.suspicious||0,tot=m+ss+(s.harmless||0)+(s.undetected||0),risk=getRisk(m,ss,tot);navigator.clipboard.writeText(`🔍 LinkGuard Scan\n🔗 ${scannedUrl}\n⚠️ Risk: ${risk.label} (${risk.score}/100)\n🔴 Malicious: ${m}  🟡 Suspicious: ${ss}  ✅ Harmless: ${s.harmless||0}\n📊 ${tot} engines checked`);setCopyMsg("Copied!");setTimeout(()=>setCopyMsg(null),2000);};
+  const handleCopy=async()=>{
+    if(!result)return;
+    const s=result.stats||{},m=s.malicious||0,ss=s.suspicious||0,tot=m+ss+(s.harmless||0)+(s.undetected||0),risk=getRisk(m,ss,tot);
+    await copyText(`🔍 LinkGuard Scan\n🔗 ${scannedUrl}\n⚠️ Risk: ${risk.label} (${risk.score}/100)\n🔴 Malicious: ${m}  🟡 Suspicious: ${ss}  ✅ Harmless: ${s.harmless||0}\n📊 ${tot} engines checked`,setCopyMsg);
+  };
   const handleExport=()=>{if(!result)return;const report={url:scannedUrl,scannedAt:result.date?new Date(result.date*1000).toISOString():new Date().toISOString(),risk:{label:risk.label,score:risk.score},stats:{malicious:mal,suspicious:sus,harmless:har,undetected:und,total:tot},flaggedEngines:flagged.map(([name,data])=>({name,category:data.category,result:data.result||null})),categories:result.categories||{},redirectChain:redirects,ssl:ssl?{issuer:ssl.cert_issuer,subject:ssl.cert_subject,expires:ssl.cert_validity_date?new Date(ssl.cert_validity_date*1000).toLocaleDateString():null}:null};const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'});const blobUrl=URL.createObjectURL(blob);const a=document.createElement('a');a.href=blobUrl;a.download=`linkguard-${shortUrl(scannedUrl).replace(/[^a-z0-9]/gi,'-')}.json`;a.click();URL.revokeObjectURL(blobUrl);};
 
-  const reset=()=>{clearTimeout(pollRef.current);setResult(null);setError(null);setLoading(false);setPhase(null);setUrl("");setScannedUrl("");setExpanded(null);setFromCache(false);document.title="LinkGuard"};
+  const reset=()=>{scanRef.current?.abort();bulkRef.current?.abort();qrRef.current?.abort();setBulkRunning(false);setResult(null);setError(null);setLoading(false);setPhase(null);setUrl("");setScannedUrl("");setExpanded(null);setFromCache(false);document.title="LinkGuard"};
 
   // ── derived state ────────────────────────────────────────────────────
   const s=result?.stats||{},mal=s.malicious||0,sus=s.suspicious||0,har=s.harmless||0,und=s.undetected||0,tot=mal+sus+har+und+(s.timeout||0);
@@ -356,26 +431,28 @@ export default function App(){
   useEffect(()=>{
     const h=e=>{
       if((e.metaKey||e.ctrlKey)&&e.key==='Enter'&&!loading&&!bulkMode){
-        if(result)reset();else if(url)doScan(url);
+        if(result)reset();else if(url)startScan(url);
       }
     };
     window.addEventListener('keydown',h);
     return()=>window.removeEventListener('keydown',h);
-  },[loading,bulkMode,result,url,doScan]);
+  },[loading,bulkMode,result,url,startScan]);
 
   // ── load shared result from ?r= URL param ────────────────────────
   useEffect(()=>{
     const key=new URLSearchParams(window.location.search).get('r');
     if(!key)return;
-    fetch(`/api/share/${key}`)
+    const ctrl=new AbortController();
+    fetch(`/api/share/${key}`,{signal:ctrl.signal})
       .then(r=>r.ok?r.json():null)
       .then(d=>{
-        if(!d?.result||!d?.url)return;
+        if(ctrl.signal.aborted||!d?.result||!d?.url)return;
         setResult(d.result);setScannedUrl(d.url);setPhase("done");setFromCache(true);
         const s=d.result?.stats||{},m=s.malicious||0,ss=s.suspicious||0,tot=m+ss+(s.harmless||0)+(s.undetected||0)+(s.timeout||0);
         const rk=getRisk(m,ss,tot);
         document.title=`${m>0||ss>0?'⚠':'✓'} ${rk.label} — LinkGuard`;
       }).catch(()=>{});
+    return()=>ctrl.abort();
   },[]);
 
   const TABS=["Overview","Intel","Charts","Engines","SSL"];
@@ -428,7 +505,7 @@ export default function App(){
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
           <button onClick={()=>{setBulkMode(b=>!b);setError(null);}} style={{padding:"9px 14px",borderRadius:10,border:`1px solid ${bulkMode?t.green:t.border}`,background:bulkMode?`${t.green}18`:t.surface,color:bulkMode?t.green:t.muted,fontFamily:"Plus Jakarta Sans",fontWeight:700,fontSize:13,cursor:"pointer",minHeight:38}}>Bulk</button>
-          <button onClick={()=>setDark(d=>!d)} style={{width:38,height:38,borderRadius:10,border:`1px solid ${t.border}`,background:t.surface,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} title={dark?"Switch to light mode":"Switch to dark mode"}>
+          <button onClick={toggleTheme} style={{width:38,height:38,borderRadius:10,border:`1px solid ${t.border}`,background:t.surface,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} title={dark?"Switch to light mode":"Switch to dark mode"}>
             {dark?(
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/>
@@ -456,13 +533,13 @@ export default function App(){
             <label style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,letterSpacing:1.2,display:"block",marginBottom:6,textTransform:"uppercase"}}>URL to Scan</label>
             <div className={`scan-row${dragOver?" dropzone-active":""}`} onDragOver={e=>{e.preventDefault();setDragOver(true);}} onDragLeave={()=>setDragOver(false)} onDrop={onDrop}
               style={{padding:dragOver?"8px":"0",borderRadius:12,border:`2px dashed ${dragOver?t.green:"transparent"}`,transition:"all 0.2s"}}>
-              <input type="url" inputMode="url" value={url} onChange={e=>setUrl(e.target.value)} onKeyDown={e=>e.key==="Enter"&&!loading&&doScan(url)}
-                onPaste={e=>{const text=e.clipboardData.getData('text').trim();if(text.startsWith('http')&&!loading)setTimeout(()=>doScan(text),50);}}
+              <input type="url" inputMode="url" value={url} onChange={e=>setUrl(e.target.value)} onKeyDown={e=>e.key==="Enter"&&!loading&&startScan(url)}
+                onPaste={e=>{const text=e.clipboardData.getData('text').trim();if(text.startsWith('http')&&!loading)void startScan(text);}}
                 placeholder="https://example.com"
                 className="url-input"
                 style={{background:t.inputBg,border:`1px solid ${t.border}`,color:t.text}}
                 onFocus={e=>e.target.style.borderColor=t.green} onBlur={e=>e.target.style.borderColor=t.border}/>
-              <button onClick={result?reset:()=>doScan(url)} disabled={loading}
+              <button onClick={result?reset:()=>startScan(url)} disabled={loading}
                 className="scan-btn"
                 style={{background:loading||result?t.border:t.green,color:loading||result?t.muted:dark?"#0a0a0f":"#fff",cursor:loading?"not-allowed":"pointer"}}>
                 {loading?"…":result?"Reset":"Scan →"}
@@ -506,7 +583,7 @@ export default function App(){
                 style={{flex:1,padding:"11px 18px",borderRadius:10,border:"none",background:bulkRunning?t.border:t.green,color:bulkRunning?t.muted:dark?"#0a0a0f":"#fff",fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:700,fontSize:13,cursor:bulkRunning?"not-allowed":"pointer",transition:"all 0.2s"}}>
                 {bulkRunning?"Scanning… (rate limited)":"Scan All →"}
               </button>
-              {bulkRunning&&<button onClick={()=>{bulkCancelRef.current=true;}}
+              {bulkRunning&&<button onClick={()=>{bulkRef.current?.abort();scanRef.current?.abort();}}
                 style={{padding:"11px 18px",borderRadius:10,border:`1px solid ${t.red}`,background:`${t.red}11`,color:t.red,fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:700,fontSize:13,cursor:"pointer",transition:"all 0.2s",flexShrink:0}}>
                 Stop
               </button>}
@@ -531,7 +608,7 @@ export default function App(){
               {history.map((item,i)=>{
                 const c=t[item.color]||t.muted;
                 return(
-                  <button key={i} onClick={()=>{setUrl(item.url);doScan(item.url);}}
+                  <button key={i} onClick={()=>{setUrl(item.url);startScan(item.url);}}
                     style={{display:"flex",alignItems:"center",gap:8,padding:"8px 11px",borderRadius:9,background:t.inputBg,border:`1px solid ${t.border}`,cursor:"pointer",textAlign:"left",width:"100%",transition:"border-color 0.2s"}}
                     onMouseEnter={e=>e.currentTarget.style.borderColor=t.green}
                     onMouseLeave={e=>e.currentTarget.style.borderColor=t.border}>
@@ -588,7 +665,7 @@ export default function App(){
                 [<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
                  handleExport,"Export JSON"],
                 [<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>,
-                 ()=>doScan(scannedUrl),"Re-scan"],
+                 ()=>startScan(scannedUrl),"Re-scan"],
               ].map(([icon,fn,title],i)=>(
 
                 <button key={i} onClick={fn}
@@ -603,14 +680,14 @@ export default function App(){
             {isStale&&(
               <div style={{padding:"8px 12px",borderRadius:10,background:`${t.yellow}0d`,border:`1px solid ${t.yellow}44`,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
                 <span style={{fontSize:10,fontFamily:"JetBrains Mono",color:t.yellow}}>⚠ Analysis is {scanAgeDays} day{scanAgeDays>1?'s':''} old — results may be outdated.</span>
-                <button onClick={()=>doScan(scannedUrl)} style={{fontSize:10,fontFamily:"JetBrains Mono",color:t.yellow,background:"transparent",border:`1px solid ${t.yellow}55`,borderRadius:6,padding:"3px 8px",cursor:"pointer"}}>Re-scan</button>
+                <button onClick={()=>startScan(scannedUrl)} style={{fontSize:10,fontFamily:"JetBrains Mono",color:t.yellow,background:"transparent",border:`1px solid ${t.yellow}55`,borderRadius:6,padding:"3px 8px",cursor:"pointer"}}>Re-scan</button>
               </div>
             )}
             {/* Cached result banner */}
             {fromCache&&(
               <div style={{padding:"7px 12px",borderRadius:10,background:`${t.blue}0d`,border:`1px solid ${t.blue}33`,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
                 <span style={{fontSize:10,fontFamily:"JetBrains Mono",color:t.blue}}>⚡ Showing cached result</span>
-                <button onClick={()=>{try{localStorage.removeItem('lg_rslt_'+scannedUrl);}catch{}setFromCache(false);doScan(scannedUrl);}} style={{fontSize:10,fontFamily:"JetBrains Mono",color:t.blue,background:"transparent",border:`1px solid ${t.blue}44`,borderRadius:6,padding:"3px 8px",cursor:"pointer"}}>Re-scan</button>
+                <button onClick={()=>{try{localStorage.removeItem('lg_rslt_'+scannedUrl);}catch{}setFromCache(false);startScan(scannedUrl);}} style={{fontSize:10,fontFamily:"JetBrains Mono",color:t.blue,background:"transparent",border:`1px solid ${t.blue}44`,borderRadius:6,padding:"3px 8px",cursor:"pointer"}}>Re-scan</button>
               </div>
             )}
             {/* Tab bar — scrollable on mobile */}
@@ -726,7 +803,7 @@ export default function App(){
                       {flagged.map(([name,data])=>{
                         const ec=data.category==="malicious"?t.red:t.yellow;
                         return(
-                          <button key={name} onClick={()=>{navigator.clipboard.writeText(`${name}: ${data.result||data.category}`);setCopiedEngine(name);setTimeout(()=>setCopiedEngine(null),1500);}}
+                          <button key={name} onClick={()=>copyText(`${name}: ${data.result||data.category}`,setCopiedEngine,name)}
                             title="Click to copy"
                             style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 11px",borderRadius:9,background:copiedEngine===name?`${ec}22`:`${ec}0a`,border:`1px solid ${ec}33`,cursor:"pointer",textAlign:"left",width:"100%",transition:"background 0.2s"}}>
                             <span style={{fontFamily:"JetBrains Mono",fontSize:11,color:t.muted}}>{name}</span>
