@@ -7,6 +7,7 @@ import { dirname, join } from 'path';
 import { existsSync } from 'fs';
 import { randomUUID } from 'crypto';
 import ipaddr from 'ipaddr.js';
+import dns from 'node:dns/promises';
 
 config();
 
@@ -75,6 +76,8 @@ async function scanWithWebRisk(url) {
     date: Math.floor(Date.now() / 1000),
     status: 'completed',
     provider: 'Google Web Risk',
+    providerMode: 'fallback',
+    coverage: 'limited',
     stats: { malicious, suspicious: 0, harmless: malicious ? 0 : 1, undetected: 0 },
     results: {
       'Google Web Risk': {
@@ -166,32 +169,59 @@ function isPrivateHostname(hostname) {
   return PRIVATE_RANGES.has(ipaddr.parse(normalized).range());
 }
 
+async function resolvesToPrivateAddress(hostname) {
+  if (isPrivateHostname(hostname)) return true;
+  const addresses = await dns.lookup(hostname, { all: true, verbatim: true });
+  return addresses.some(({ address }) => isPrivateHostname(address));
+}
+
+async function validatePublicUrl(url) {
+  let parsed;
+  try { parsed = new URL(url); } catch { return { valid: false, message: 'Invalid URL.' }; }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return { valid: false, message: 'Only http/https URLs are supported.' };
+  }
+  try {
+    if (await resolvesToPrivateAddress(parsed.hostname)) {
+      return { valid: false, message: 'Private/internal addresses are not allowed.' };
+    }
+  } catch {
+    return { valid: false, message: 'Unable to validate target hostname.' };
+  }
+  return { valid: true };
+}
+
 app.get('/api/expand', async (req, res) => {
   const url = req.query.url?.trim();
   if (!url) return res.status(400).json({ error: 'Missing url' });
   let parsed;
   try { parsed = new URL(url); } catch { return res.status(400).json({ error: 'Invalid URL' }); }
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    return res.status(400).json({ error: 'Only http/https URLs are supported.' });
-  }
-  if (isPrivateHostname(parsed.hostname)) {
-    return res.status(400).json({ error: 'Private/internal addresses are not allowed.' });
-  }
   try {
-    const r = await fetch(url, {
-      method: 'HEAD',
-      redirect: 'follow',
-      signal: AbortSignal.timeout(5000),
-      headers: { 'User-Agent': 'LinkGuard/1.0' },
-    });
-    // Guard against redirects that land on private/internal addresses
-    try {
-      const finalHostname = new URL(r.url).hostname;
-      if (isPrivateHostname(finalHostname)) return res.json({ resolved: url });
-    } catch {}
-    res.json({ resolved: r.url });
+    let currentUrl = parsed.href;
+    for (let redirectCount = 0; redirectCount <= 5; redirectCount += 1) {
+      const validation = await validatePublicUrl(currentUrl);
+      if (!validation.valid) return res.status(400).json({ error: validation.message });
+
+      const r = await fetch(currentUrl, {
+        method: 'HEAD',
+        redirect: 'manual',
+        signal: AbortSignal.timeout(5000),
+        headers: { 'User-Agent': 'LinkGuard/1.0' },
+      });
+      if (![301, 302, 303, 307, 308].includes(r.status)) {
+        const finalUrl = r.url || currentUrl;
+        const finalValidation = await validatePublicUrl(finalUrl);
+        if (!finalValidation.valid) return res.json({ resolved: currentUrl });
+        return res.json({ resolved: finalUrl });
+      }
+
+      const location = r.headers?.get('location');
+      if (!location) return res.json({ resolved: currentUrl });
+      try { currentUrl = new URL(location, currentUrl).href; } catch { return res.json({ resolved: currentUrl }); }
+    }
+    return res.status(508).json({ error: 'Too many redirects.' });
   } catch {
-    res.json({ resolved: url });
+    res.json({ resolved: parsed.href });
   }
 });
 

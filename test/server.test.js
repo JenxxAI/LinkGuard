@@ -7,6 +7,15 @@ process.env.GOOGLE_WEBRISK_API_KEY = 'test-webrisk-key';
 
 const { app } = await import('../server.js');
 
+describe('GET /api/health', () => {
+  it('returns a health response without requiring an external provider', async () => {
+    const response = await request(app).get('/api/health');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ status: 'ok' });
+  });
+});
+
 describe('POST /api/urls', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -93,7 +102,7 @@ describe('GET /api/expand', () => {
     expect(response.body).toEqual({ resolved: 'https://example.com/final' });
     expect(upstream).toHaveBeenCalledWith(
       'https://example.com/short',
-      expect.objectContaining({ method: 'HEAD', redirect: 'follow' }),
+      expect.objectContaining({ method: 'HEAD', redirect: 'manual' }),
     );
   });
 
@@ -127,15 +136,18 @@ describe('GET /api/expand', () => {
   });
 
   it('does not return a private final redirect target', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      url: 'http://127.0.0.1:3001/internal',
+    const upstream = vi.fn().mockResolvedValue(new Response(null, {
+      status: 302,
+      headers: { location: 'http://127.0.0.1:3001/internal' },
     }));
+    vi.stubGlobal('fetch', upstream);
 
     const response = await request(app)
       .get('/api/expand')
       .query({ url: 'https://example.com/redirect' });
 
-    expect(response.status).toBe(200);
-    expect(response.body).toEqual({ resolved: 'https://example.com/redirect' });
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: 'Private/internal addresses are not allowed.' });
+    expect(upstream).toHaveBeenCalledOnce();
   });
 });
