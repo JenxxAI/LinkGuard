@@ -448,6 +448,7 @@ export default function App(){
   const clean=engines.filter(([,v])=>v.category==="harmless"||v.category==="undetected");
   const ssl=result?.last_https_certificate;
   const redirects=result?.redirection_chain||[];
+  const limitedCoverage=result?.coverage==="limited"||result?.providerMode==="fallback";
   const lastAnalysisDate=result?.date?new Date(result.date*1000).toLocaleString():null;
   const scanAgeDays=result?.date?Math.floor((Date.now()-result.date*1000)/86400000):0;
   const isStale=scanAgeDays>=7;
@@ -743,6 +744,11 @@ export default function App(){
               <div style={{padding:"7px 12px",borderRadius:10,background:`${t.blue}0d`,border:`1px solid ${t.blue}33`,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
                 <span style={{fontSize:10,fontFamily:"JetBrains Mono",color:t.blue}}>⚡ Showing cached result</span>
                 <button onClick={()=>{try{localStorage.removeItem('lg_rslt_'+scannedUrl);}catch{}setFromCache(false);startScan(scannedUrl);}} style={{fontSize:10,fontFamily:"JetBrains Mono",color:t.blue,background:"transparent",border:`1px solid ${t.blue}44`,borderRadius:6,padding:"3px 8px",cursor:"pointer"}}>Re-scan</button>
+              </div>
+            )}
+            {limitedCoverage&&(
+              <div style={{padding:"8px 12px",borderRadius:10,background:`${t.yellow}0d`,border:`1px solid ${t.yellow}44`,color:t.yellow,fontFamily:"JetBrains Mono",fontSize:10,lineHeight:1.5}}>
+                Limited coverage: this result was checked by {result.provider||"a fallback provider"}, not the full VirusTotal engine network.
               </div>
             )}
             {/* Tab bar — scrollable on mobile */}

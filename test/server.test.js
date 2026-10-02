@@ -12,6 +12,15 @@ beforeEach(async () => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
+describe('GET /api/health', () => {
+  it('returns a health response without requiring an external provider', async () => {
+    const response = await request(app).get('/api/health');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ status: 'ok' });
+  });
+});
+
 describe('POST /api/urls', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
