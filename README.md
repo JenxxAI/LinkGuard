@@ -34,6 +34,10 @@ npm run dev                   # starts both Vite (5173) and Express (3001)
 - Dark / light theme (OS default auto-detected)
 - iOS PWA-ready (safe-area insets, home screen installable)
 
+## Render keep-awake check
+
+The repository includes a GitHub Actions workflow that calls the lightweight `/api/health` endpoint every 14 minutes. This helps prevent the Render free web service from sleeping without calling VirusTotal, Google Web Risk, or any scan endpoint. GitHub Actions schedules can be delayed, so the first request after a longer idle period may still take a little longer while Render wakes up.
+
 ## Security notes
 - API key is never exposed to the frontend
 - Optional Google Web Risk fallback handles VirusTotal quota or temporary outages

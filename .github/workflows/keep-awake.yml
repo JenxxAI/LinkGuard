@@ -1,0 +1,17 @@
+name: Keep Render service awake
+
+on:
+  schedule:
+    # Render's free web services sleep after about 15 minutes of inactivity.
+    - cron: '*/14 * * * *'
+  workflow_dispatch:
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Check Render health endpoint
+        env:
+          HEALTH_URL: https://linkguard-rola.onrender.com/api/health
+        run: curl --fail --silent --show-error --max-time 30 "$HEALTH_URL"
