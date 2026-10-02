@@ -27,7 +27,7 @@ function RadarChart({mal,sus,har,und,t}){
   const axes=Array.from({length:n},(_,i)=>{const a=(i/n)*2*Math.PI-Math.PI/2;return[cx+r*Math.cos(a),cy+r*Math.sin(a)];});
   const labelPos=Array.from({length:n},(_,i)=>{const a=(i/n)*2*Math.PI-Math.PI/2;return[cx+(r+18)*Math.cos(a),cy+(r+14)*Math.sin(a)];});
   return(
-    <svg viewBox="0 0 160 160" width="160" height="160" style={{overflow:"visible"}}>
+    <svg role="img" aria-label={`Threat profile: ${mal} malicious, ${sus} suspicious, ${har} harmless, ${und} undetected.`} viewBox="0 0 160 160" width="160" height="160" style={{overflow:"visible"}}>
       {[0.25,0.5,0.75,1].map((sc,i)=>{
         const gpts=Array.from({length:n},(_,j)=>{const a=(j/n)*2*Math.PI-Math.PI/2;return`${cx+r*sc*Math.cos(a)},${cy+r*sc*Math.sin(a)}`;}).join(" ");
         return <polygon key={i} points={gpts} fill="none" stroke={t.border} strokeWidth="1"/>;
@@ -49,7 +49,7 @@ function DonutChart({mal,sus,har,und,t}){
   const segs=[{v:mal,c:t.red},{v:sus,c:t.yellow},{v:har,c:t.green},{v:und,c:t.muted}];
   let offset=0;const r=36,cx=50,cy=50,circ=2*Math.PI*r;
   return(
-    <svg viewBox="0 0 100 100" width="90" height="90">
+    <svg role="img" aria-label={`Engine distribution: ${mal} malicious, ${sus} suspicious, ${har} harmless, ${und} undetected.`} viewBox="0 0 100 100" width="90" height="90">
       <circle cx={cx} cy={cy} r={r} fill="none" stroke={t.border} strokeWidth="14"/>
       {segs.map((seg,i)=>{
         if(!seg.v)return null;
@@ -69,16 +69,27 @@ function DonutChart({mal,sus,har,und,t}){
 function RiskGauge({score,label,colorKey,t}){
   const [disp,setDisp]=useState(0);
   useEffect(()=>{
-    if(!score){setDisp(0);return;}
-    let start=null;const dur=900;
-    const step=ts=>{if(!start)start=ts;const p=Math.min((ts-start)/dur,1);setDisp(Math.round(p*score));if(p<1)raf=requestAnimationFrame(step);};
-    let raf=requestAnimationFrame(step);
-    return()=>cancelAnimationFrame(raf);
+    const media=window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    let raf;
+    const animate=()=>{
+      cancelAnimationFrame(raf);
+      if(!score||media?.matches){setDisp(score);return;}
+      let start=null;
+      const step=ts=>{
+        if(start===null)start=ts;
+        const progress=Math.min((ts-start)/900,1);
+        setDisp(Math.round(progress*score));
+        if(progress<1)raf=requestAnimationFrame(step);
+      };
+      raf=requestAnimationFrame(step);
+    };
+    animate();media?.addEventListener('change',animate);
+    return()=>{cancelAnimationFrame(raf);media?.removeEventListener('change',animate);};
   },[score]);
   const angle=-135+(disp/100)*270,color=t[colorKey]||t.muted;
   return(
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
-      <svg viewBox="0 0 120 80" width="100" height="67">
+      <svg role="img" aria-label={`Risk score: ${score} out of 100. ${label}.`} viewBox="0 0 120 80" width="100" height="67">
         <path d="M10 70 A50 50 0 0 1 110 70" fill="none" stroke={t.border} strokeWidth="10" strokeLinecap="round"/>
         <path d="M10 70 A50 50 0 0 1 110 70" fill="none" stroke={color} strokeWidth="10" strokeLinecap="round"
           strokeDasharray="157" strokeDashoffset={157-(disp/100)*157}/>
@@ -130,13 +141,13 @@ function CategoryTags({categories,t}){
 
 // ── SSL Card ───────────────────────────────────────────────────────────
 function SSLCard({ssl,t}){
-  if(!ssl)return<InfoRow icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>} label="SSL" value="No certificate data available" color={t.muted} t={t}/>;
+  if(!ssl)return<InfoRow icon={<svg aria-hidden="true" focusable="false" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>} label="SSL" value="No certificate data available" color={t.muted} t={t}/>;
   const exp=ssl.cert_validity_date?new Date(ssl.cert_validity_date*1000).toLocaleDateString():"N/A";
   const valid=ssl.cert_validity_date?(ssl.cert_validity_date*1000>Date.now()):null;
   return(
     <div style={{display:"flex",flexDirection:"column",gap:6,padding:"12px 14px",borderRadius:12,background:t.inputBg,border:`1px solid ${valid===false?t.red:t.border}`}}>
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:2}}>
-        <span style={{color:valid===false?t.red:t.green,display:"flex"}}>{valid===false?(<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>):(<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>)}</span>
+        <span style={{color:valid===false?t.red:t.green,display:"flex"}}>{valid===false?(<svg aria-hidden="true" focusable="false" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>):(<svg aria-hidden="true" focusable="false" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>)}</span>
         <span style={{fontFamily:"JetBrains Mono",fontSize:11,fontWeight:700,color:valid===false?t.red:t.green}}>{valid===false?"EXPIRED SSL":valid?"VALID SSL":"SSL INFO"}</span>
       </div>
       {[["Issuer",ssl.cert_issuer],["Subject",ssl.cert_subject],["Expires",exp],["Serial",ssl.cert_serial_number]].filter(([,v])=>v&&v!=="N/A").map(([k,v])=>(
@@ -164,17 +175,18 @@ function InfoRow({icon,label,value,color,t,mono=true}){
 
 
 // ── Bulk Row ───────────────────────────────────────────────────────────
-function BulkRow({item,t}){
+function BulkRow({item,t,onRetry}){
   const risk=item.result?getRisk(item.result.malicious,item.result.suspicious,item.result.total):{score:0,label:item.status==="error"?"Error":item.status,color:null};
   const color=t[risk.color]||t.muted;
   return(
-    <div style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",borderRadius:10,background:t.inputBg,border:`1px solid ${color}44`}}>
+    <div role={item.status==="error"?"alert":undefined} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",borderRadius:10,background:t.inputBg,border:`1px solid ${color}44`}}>
       <div style={{width:8,height:8,borderRadius:"50%",background:color,flexShrink:0,boxShadow:item.result?`0 0 5px ${color}66`:"none"}}/>
       <div style={{flex:1,overflow:"hidden"}}>
         <div style={{fontFamily:"JetBrains Mono",fontSize:10,color:t.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{shortUrl(item.url)}</div>
         {item.result&&<div style={{fontSize:9,color:t.muted,marginTop:1}}>{item.result.malicious+item.result.suspicious}/{item.result.total} engines flagged</div>}
       </div>
       <span style={{fontSize:10,fontFamily:"JetBrains Mono",color,flexShrink:0,textAlign:"right"}}>{risk.label}</span>
+      {item.status==='error'&&<button onClick={onRetry} aria-label={`Retry scan for ${item.url}`} style={{padding:"8px",borderRadius:8,border:`1px solid ${t.border}`,background:t.surface,color:t.text}}>Retry</button>}
     </div>
   );
 }
@@ -218,6 +230,11 @@ export default function App(){
   const [result,setResult]=useState(null);
   const [scannedUrl,setScannedUrl]=useState("");
   const [phase,setPhase]=useState(null);
+  const [qrMessage,setQrMessage]=useState('');
+  const urlInputRef=useRef(null);
+  const tabRefs=useRef({});
+  const retryRef=useRef(null);
+  useEffect(()=>{if(phase==='error')retryRef.current?.focus();},[phase]);
   const [tab,setTab]=useState("Overview");
   const [shareMsg,setShareMsg]=useState(null);
   const [copyMsg,setCopyMsg]=useState(null);
@@ -269,6 +286,7 @@ export default function App(){
   const handleQR=()=>qrInputRef.current?.click();
   const onQRFile=async e=>{
     const file=e.target.files?.[0];if(!file)return;e.target.value='';
+    setQrMessage('Detecting QR code…');
     qrRef.current?.abort();
     const ctrl=new AbortController();qrRef.current=ctrl;
     let bitmap;
@@ -280,8 +298,9 @@ export default function App(){
       const codes=await bd.detect(bitmap);
       if(ctrl.signal.aborted)return;
       found=codes.find(c=>/^https?:\/\//i.test(c.rawValue))?.rawValue;
+      setQrMessage(found?`QR code detected: ${found}`:'');
       if(!found)setError('No URL found in QR code.');
-    }catch{if(!ctrl.signal.aborted)setError('QR scanning is not supported in this browser.');}
+    }catch{if(!ctrl.signal.aborted){setQrMessage('');setError('QR scanning is not supported in this browser.');}}
     finally{bitmap?.close();}
     if(found&&!ctrl.signal.aborted){setUrl(found);await startScan(found);}
   };
@@ -347,7 +366,7 @@ export default function App(){
       }
       throw new Error("Timed out");
     }catch(e){
-      if(!silent&&!signal.aborted){setError(e.message||"Error occurred.");setLoading(false);setPhase(null);setFromCache(false);}
+      if(!silent&&!signal.aborted){setError(e.message||"Error occurred.");setLoading(false);setPhase("error");setFromCache(false);}
       throw e;
     }
   },[]);
@@ -413,7 +432,13 @@ export default function App(){
   };
   const handleExport=()=>{if(!result)return;const report={url:scannedUrl,scannedAt:result.date?new Date(result.date*1000).toISOString():new Date().toISOString(),risk:{label:risk.label,score:risk.score},stats:{malicious:mal,suspicious:sus,harmless:har,undetected:und,total:tot},flaggedEngines:flagged.map(([name,data])=>({name,category:data.category,result:data.result||null})),categories:result.categories||{},redirectChain:redirects,ssl:ssl?{issuer:ssl.cert_issuer,subject:ssl.cert_subject,expires:ssl.cert_validity_date?new Date(ssl.cert_validity_date*1000).toLocaleDateString():null}:null};const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'});const blobUrl=URL.createObjectURL(blob);const a=document.createElement('a');a.href=blobUrl;a.download=`linkguard-${shortUrl(scannedUrl).replace(/[^a-z0-9]/gi,'-')}.json`;a.click();URL.revokeObjectURL(blobUrl);};
 
-  const reset=()=>{scanRef.current?.abort();bulkRef.current?.abort();qrRef.current?.abort();setBulkRunning(false);setResult(null);setError(null);setLoading(false);setPhase(null);setUrl("");setScannedUrl("");setExpanded(null);setFromCache(false);document.title="LinkGuard"};
+  const cancelScan=()=>{
+    scanRef.current?.abort();bulkRef.current?.abort();qrRef.current?.abort();
+    setLoading(false);setBulkRunning(false);setError(null);setPhase('cancelled');
+    setBulkResults(prev=>prev.map(item=>['queued','scanning'].includes(item.status)?{...item,status:'cancelled'}:item));
+    urlInputRef.current?.focus();
+  };
+  const reset=()=>{scanRef.current?.abort();bulkRef.current?.abort();qrRef.current?.abort();setBulkRunning(false);setResult(null);setError(null);setLoading(false);setPhase(null);setUrl("");setQrMessage("");urlInputRef.current?.focus();setScannedUrl("");setExpanded(null);setFromCache(false);document.title="LinkGuard"};
 
   // ── derived state ────────────────────────────────────────────────────
   const s=result?.stats||{},mal=s.malicious||0,sus=s.suspicious||0,har=s.harmless||0,und=s.undetected||0,tot=mal+sus+har+und+(s.timeout||0);
@@ -456,6 +481,17 @@ export default function App(){
   },[]);
 
   const TABS=["Overview","Intel","Charts","Engines","SSL"];
+  const onTabKeyDown=(event,id)=>{
+    const index=TABS.indexOf(id);
+    const next={ArrowRight:(index+1)%TABS.length,ArrowLeft:(index+TABS.length-1)%TABS.length,Home:0,End:TABS.length-1}[event.key];
+    if(next===undefined)return;
+    event.preventDefault();setTab(TABS[next]);tabRefs.current[TABS[next]]?.focus();
+  };
+  const scanMessage=loading
+    ?(phase==='submitting'?'Submitting URL for scanning.':'Engines are analyzing the URL.')
+    :phase==='cancelled'?'Scan cancelled. You can edit the URL and scan again.'
+    :phase==='error'?'Scan failed. Retry is available.'
+    :phase==='done'&&result?`${fromCache?'Cached result loaded':'Scan complete'}. ${risk.label}. ${tot} engines checked.`:'';
 
   // ── render ───────────────────────────────────────────────────────────
   return(<>
@@ -464,6 +500,14 @@ export default function App(){
       html{height:-webkit-fill-available;}
       body{background:${t.bg};color:${t.text};font-family:'Plus Jakarta Sans',sans-serif;transition:background 0.3s,color 0.3s;-webkit-tap-highlight-color:transparent;min-height:100vh;min-height:-webkit-fill-available;overscroll-behavior:none;}
       button,a{touch-action:manipulation;}
+      button,a,summary,input:not([type="file"]),textarea{min-width:44px;min-height:44px;}
+      a,summary{align-content:center;}
+      :focus-visible{outline:3px solid ${dark?'#ffffff':'#111118'}!important;outline-offset:3px;box-shadow:0 0 0 6px ${t.bg}!important;}
+      .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0;}
+      [hidden]{display:none!important;}
+      @media(prefers-reduced-motion:reduce){
+        *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important;}
+      }
       details summary{list-style:none;cursor:pointer;}
       details summary::-webkit-details-marker{display:none;}
       ::-webkit-scrollbar{width:4px;}
@@ -478,10 +522,10 @@ export default function App(){
       .scan-row{display:flex;gap:clamp(6px,2vw,10px);}
       .url-input{flex:1;min-width:0;padding:clamp(11px,2.5vw,14px) clamp(12px,3vw,16px);border-radius:10px;font-family:'JetBrains Mono',monospace;font-size:16px;outline:none;width:100%;}
       .scan-btn{flex-shrink:0;padding:clamp(11px,2.5vw,14px) clamp(16px,4vw,22px);border-radius:10px;border:none;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:clamp(13px,3.5vw,14px);cursor:pointer;white-space:nowrap;transition:all 0.2s;min-height:44px;}
-      .tab-bar{display:flex;gap:3px;border-radius:12px;padding:3px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+      .tab-bar{display:flex;gap:3px;border-radius:12px;padding:7px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
       .tab-bar::-webkit-scrollbar{display:none;}
-      .tab-btn{flex:1;min-width:fit-content;padding:clamp(7px,2vw,9px) clamp(6px,2vw,10px);border-radius:9px;border:none;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:clamp(11px,3vw,13px);transition:all 0.2s;white-space:nowrap;}
-      .action-btn{font-size:clamp(13px,3.5vw,15px);width:clamp(34px,9vw,38px);height:clamp(34px,9vw,38px);border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:border-color 0.2s;}
+      .tab-btn{flex:1 0 auto;min-width:44px;padding:clamp(7px,2vw,9px) clamp(6px,2vw,10px);border-radius:9px;border:none;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:clamp(11px,3vw,13px);transition:all 0.2s;white-space:nowrap;}
+      .action-btn{font-size:clamp(13px,3.5vw,15px);width:44px;height:44px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:border-color 0.2s;}
       .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(6px,2vw,10px);}
       @media(max-width:420px){
         .scan-row{flex-direction:column;}
@@ -490,6 +534,11 @@ export default function App(){
       }
     `}</style>
 
+    <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{scanMessage}</div>
+    <div className="sr-only" aria-live="polite" aria-atomic="true">{bulkRunning?`Bulk scanning. ${bulkResults.filter(item=>item.status==='done'||item.status==='error').length} of ${bulkResults.length} URLs processed.`:bulkResults.length?`Bulk scan ${bulkResults.some(item=>item.status==='cancelled')?'cancelled':'finished'}. ${bulkResults.filter(item=>item.status==='error').length} errors.`:''}</div>
+    <div className="sr-only" aria-live="polite" aria-atomic="true">{qrMessage}</div>
+    <div className="sr-only" aria-live="polite" aria-atomic="true">{expandLoading?'Resolving short URL…':expanded?`Short URL resolves to ${expanded}`:''}</div>
+    <div className="sr-only" aria-live="polite" aria-atomic="true">{copyMsg||shareMsg||(copiedEngine?copiedEngine==='Copy failed'?'Copy failed':`Copied ${copiedEngine}`:'')}</div>
     <div style={{minHeight:"100vh",background:t.bg,display:"flex",flexDirection:"column",alignItems:"center",
       paddingTop:"max(clamp(14px,4vw,28px),env(safe-area-inset-top))",
       paddingBottom:"max(80px,calc(60px + env(safe-area-inset-bottom)))",
@@ -504,17 +553,17 @@ export default function App(){
           <p style={{color:t.muted,fontSize:"clamp(10px,2.5vw,12px)",marginTop:2}}>70+ security engines · Instant scan</p>
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
-          <button onClick={()=>{setBulkMode(b=>!b);setError(null);}} style={{padding:"9px 14px",borderRadius:10,border:`1px solid ${bulkMode?t.green:t.border}`,background:bulkMode?`${t.green}18`:t.surface,color:bulkMode?t.green:t.muted,fontFamily:"Plus Jakarta Sans",fontWeight:700,fontSize:13,cursor:"pointer",minHeight:38}}>Bulk</button>
-          <button onClick={toggleTheme} style={{width:38,height:38,borderRadius:10,border:`1px solid ${t.border}`,background:t.surface,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} title={dark?"Switch to light mode":"Switch to dark mode"}>
+          <button aria-pressed={bulkMode} onClick={()=>{setBulkMode(b=>!b);setError(null);}} style={{padding:"9px 14px",borderRadius:10,border:`1px solid ${bulkMode?t.green:t.border}`,background:bulkMode?`${t.green}18`:t.surface,color:bulkMode?t.green:t.muted,fontFamily:"Plus Jakarta Sans",fontWeight:700,fontSize:13,cursor:"pointer",minHeight:44}}>Bulk</button>
+          <button aria-label={dark?"Switch to light mode":"Switch to dark mode"} onClick={toggleTheme} style={{width:44,height:44,borderRadius:10,border:`1px solid ${t.border}`,background:t.surface,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} title={dark?"Switch to light mode":"Switch to dark mode"}>
             {dark?(
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/>
                 <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
                 <line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/>
                 <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
               </svg>
             ):(
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
               </svg>
             )}
@@ -530,10 +579,10 @@ export default function App(){
         {/* Single scan or bulk toggle */}
         {!bulkMode?(
           <div>
-            <label style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,letterSpacing:1.2,display:"block",marginBottom:6,textTransform:"uppercase"}}>URL to Scan</label>
+            <label htmlFor="scan-url" style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,letterSpacing:1.2,display:"block",marginBottom:6,textTransform:"uppercase"}}>URL to Scan</label>
             <div className={`scan-row${dragOver?" dropzone-active":""}`} onDragOver={e=>{e.preventDefault();setDragOver(true);}} onDragLeave={()=>setDragOver(false)} onDrop={onDrop}
               style={{padding:dragOver?"8px":"0",borderRadius:12,border:`2px dashed ${dragOver?t.green:"transparent"}`,transition:"all 0.2s"}}>
-              <input type="url" inputMode="url" value={url} onChange={e=>setUrl(e.target.value)} onKeyDown={e=>e.key==="Enter"&&!loading&&startScan(url)}
+              <input id="scan-url" ref={urlInputRef} type="url" inputMode="url" value={url} onChange={e=>setUrl(e.target.value)} onKeyDown={e=>e.key==="Enter"&&!loading&&startScan(url)}
                 onPaste={e=>{const text=e.clipboardData.getData('text').trim();if(text.startsWith('http')&&!loading)void startScan(text);}}
                 placeholder="https://example.com"
                 className="url-input"
@@ -542,23 +591,23 @@ export default function App(){
               <button onClick={result?reset:()=>startScan(url)} disabled={loading}
                 className="scan-btn"
                 style={{background:loading||result?t.border:t.green,color:loading||result?t.muted:dark?"#0a0a0f":"#fff",cursor:loading?"not-allowed":"pointer"}}>
-                {loading?"…":result?"Reset":"Scan →"}
+                {loading?"Scanning…":result?"Reset":"Scan →"}
               </button>
             </div>
             {'BarcodeDetector' in window&&(
               <button onClick={handleQR} title="Scan a QR code image"
                 style={{marginTop:6,width:"100%",padding:"9px",borderRadius:10,border:`1px solid ${t.border}`,background:t.surface,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
                   <rect x="7" y="7" width="3" height="3" rx="0.5"/><rect x="14" y="7" width="3" height="3" rx="0.5"/><rect x="14" y="14" width="3" height="3" rx="0.5"/><rect x="7" y="14" width="3" height="3" rx="0.5"/>
                 </svg>
                 <span style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:700,fontSize:12,color:t.muted}}>Scan QR Code</span>
               </button>
             )}
-            <input ref={qrInputRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={onQRFile}/>
+            <input id="qr-file" aria-label="QR code image" ref={qrInputRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={onQRFile}/>
             {url&&url.startsWith('http://')&&!url.startsWith('https://')&&(
               <div style={{marginTop:6,display:"flex",gap:7,padding:"7px 10px",borderRadius:8,background:`${t.yellow}0d`,border:`1px solid ${t.yellow}33`,alignItems:"center"}}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={t.yellow} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
+                <svg aria-hidden="true" focusable="false" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={t.yellow} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
                   <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
                 </svg>
                 <span style={{fontFamily:"JetBrains Mono",fontSize:10,color:t.yellow}}>This URL uses plain HTTP — data is not encrypted.</span>
@@ -574,8 +623,8 @@ export default function App(){
           </div>
         ):(
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            <label style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,letterSpacing:1.2,textTransform:"uppercase"}}>Bulk Scan — one URL per line</label>
-            <textarea value={bulkText} onChange={e=>setBulkText(e.target.value)} placeholder={"https://example.com\nhttps://another-url.com\nhttps://third-url.com"}
+            <label htmlFor="bulk-urls" style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,letterSpacing:1.2,textTransform:"uppercase"}}>Bulk Scan — one URL per line</label>
+            <textarea id="bulk-urls" value={bulkText} onChange={e=>setBulkText(e.target.value)} placeholder={"https://example.com\nhttps://another-url.com\nhttps://third-url.com"}
               rows={4} style={{width:"100%",padding:"11px 13px",borderRadius:10,background:t.inputBg,border:`1px solid ${t.border}`,color:t.text,fontFamily:"JetBrains Mono",fontSize:11,outline:"none",resize:"vertical"}}
               onFocus={e=>e.target.style.borderColor=t.green} onBlur={e=>e.target.style.borderColor=t.border}/>
             <div style={{display:"flex",gap:8}}>
@@ -583,7 +632,7 @@ export default function App(){
                 style={{flex:1,padding:"11px 18px",borderRadius:10,border:"none",background:bulkRunning?t.border:t.green,color:bulkRunning?t.muted:dark?"#0a0a0f":"#fff",fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:700,fontSize:13,cursor:bulkRunning?"not-allowed":"pointer",transition:"all 0.2s"}}>
                 {bulkRunning?"Scanning… (rate limited)":"Scan All →"}
               </button>
-              {bulkRunning&&<button onClick={()=>{bulkRef.current?.abort();scanRef.current?.abort();}}
+              {bulkRunning&&<button onClick={cancelScan}
                 style={{padding:"11px 18px",borderRadius:10,border:`1px solid ${t.red}`,background:`${t.red}11`,color:t.red,fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:700,fontSize:13,cursor:"pointer",transition:"all 0.2s",flexShrink:0}}>
                 Stop
               </button>}
@@ -591,7 +640,7 @@ export default function App(){
             {bulkRunning&&<p style={{fontSize:9,color:t.muted,fontFamily:"JetBrains Mono",textAlign:"center"}}>⏱ 15s delay between scans · tap Stop to cancel</p>}
             {bulkResults.length>0&&(
               <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                {bulkResults.map((item,i)=><BulkRow key={i} item={item} t={t}/>)}
+                {bulkResults.map((item,i)=><BulkRow key={i} item={item} t={t} onRetry={()=>{setBulkMode(false);setUrl(item.url);void startScan(item.url);}}/>)}
               </div>
             )}
           </div>
@@ -602,8 +651,9 @@ export default function App(){
           <details>
             <summary style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,letterSpacing:1,textTransform:"uppercase",userSelect:"none",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"2px 0"}}>
               <span>Recent ({history.length})</span>
-              <span style={{color:t.red,padding:"2px 6px",cursor:"pointer"}} onClick={e=>{e.preventDefault();setHistory([]);localStorage.removeItem('lg_history');}}>Clear</span>
+
             </summary>
+            <button onClick={()=>{setHistory([]);try{localStorage.removeItem('lg_history');}catch{}}} style={{color:t.red,background:t.surface,border:`1px solid ${t.border}`,borderRadius:8,padding:"8px 12px"}}>Clear history</button>
             <div style={{display:"flex",flexDirection:"column",gap:4,marginTop:8,maxHeight:200,overflowY:"auto"}}>
               {history.map((item,i)=>{
                 const c=t[item.color]||t.muted;
@@ -633,8 +683,13 @@ export default function App(){
           </div>
         )}
 
+        {loading&&<button onClick={cancelScan} className="scan-btn" style={{color:t.red,background:t.surface,border:`1px solid ${t.red}`}}>Cancel Scan</button>}
+        {phase==='cancelled'&&<p style={{color:t.code,fontSize:13}}>Scan cancelled. Your URL is ready to scan again.</p>}
+
         {/* Error */}
-        {error&&<div style={{padding:12,borderRadius:10,background:`${t.red}0d`,border:`1px solid ${t.red}33`,color:t.red,fontFamily:"JetBrains Mono",fontSize:11}}>✕ {error}</div>}
+        {error&&<div role="alert" style={{padding:12,borderRadius:10,background:`${t.red}0d`,border:`1px solid ${t.red}33`,color:t.red,fontFamily:"JetBrains Mono",fontSize:11}}>✕ {error}</div>}
+
+        {phase==='error'&&!loading&&<button ref={retryRef} onClick={()=>startScan(scannedUrl)} className="scan-btn" style={{background:t.green,color:dark?'#0a0a0f':'#fff'}}>Retry Scan</button>}
 
         {/* Results */}
         {result&&(
@@ -655,16 +710,16 @@ export default function App(){
               <span style={{fontFamily:"JetBrains Mono",fontSize:"clamp(9px,2.5vw,11px)",color:t.code,flex:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",minWidth:80}}>{scannedUrl}</span>
               {[
                 [copyMsg
-                  ?<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  :<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>,
+                  ?<svg aria-hidden="true" focusable="false" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  :<svg aria-hidden="true" focusable="false" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>,
                  handleCopy,"Copy results"],
                 [shareMsg
-                  ?<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  :<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>,
+                  ?<svg aria-hidden="true" focusable="false" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  :<svg aria-hidden="true" focusable="false" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>,
                  handleShare,"Share link"],
-                [<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+                [<svg aria-hidden="true" focusable="false" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
                  handleExport,"Export JSON"],
-                [<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>,
+                [<svg aria-hidden="true" focusable="false" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>,
                  ()=>startScan(scannedUrl),"Re-scan"],
               ].map(([icon,fn,title],i)=>(
 
@@ -672,7 +727,7 @@ export default function App(){
                   className="action-btn"
                   style={{border:`1px solid ${t.border}`,background:t.surface,color:t.muted}}
                   onMouseEnter={e=>e.currentTarget.style.borderColor=t.green} onMouseLeave={e=>e.currentTarget.style.borderColor=t.border}
-                  title={title}>{icon}</button>
+                  aria-label={title} title={title}>{icon}</button>
               ))}
             </div>
 
@@ -691,9 +746,9 @@ export default function App(){
               </div>
             )}
             {/* Tab bar — scrollable on mobile */}
-            <div className="tab-bar" style={{background:t.inputBg,border:`1px solid ${t.border}`}}>
+            <div role="tablist" aria-label="Scan result details" className="tab-bar" style={{background:t.inputBg,border:`1px solid ${t.border}`}}>
               {TABS.map(id=>(
-                <button key={id} className="tab-btn" onClick={()=>setTab(id)}
+                <button key={id} id={`tab-${id}`} role="tab" aria-selected={tab===id} aria-controls={`panel-${id}`} tabIndex={tab===id?0:-1} ref={node=>{tabRefs.current[id]=node;}} onKeyDown={event=>onTabKeyDown(event,id)} className="tab-btn" onClick={()=>setTab(id)}
                   style={{background:tab===id?t.green:"transparent",color:tab===id?(dark?"#0a0a0f":"#fff"):t.muted,position:"relative"}}>
                   {id}
                   {id==="Engines"&&flagged.length>0&&(
@@ -704,8 +759,7 @@ export default function App(){
             </div>
 
             {/* ── Overview ──────────────────────────────────── */}
-            {tab==="Overview"&&(
-              <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            <div id="panel-Overview" role="tabpanel" aria-labelledby="tab-Overview" tabIndex={0} hidden={tab!=="Overview"} style={{display:"flex",flexDirection:"column",gap:12}}>
                 <div style={{display:"flex",gap:12,alignItems:"center",padding:16,borderRadius:14,background:`${rc}0d`,border:`1px solid ${rc}33`,flexWrap:"wrap"}}>
                   <RiskGauge score={risk.score} label={risk.label} colorKey={risk.color} t={t}/>
                   <div style={{flex:1,minWidth:160}}>
@@ -739,19 +793,17 @@ export default function App(){
                   </div>
                 )}
               </div>
-            )}
 
             {/* ── Intel ─────────────────────────────────────── */}
-            {tab==="Intel"&&(
-              <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                <InfoRow icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>} label="Final URL" value={result.url||scannedUrl} t={t}/>
-                {result.tld&&<InfoRow icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>} label="TLD" value={result.tld} t={t}/>}
-                {result.last_http_response_code&&<InfoRow icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>} label="HTTP Status" value={`${result.last_http_response_code}`} color={result.last_http_response_code===200?t.green:t.yellow} t={t}/>}
-                {result.last_http_response_content_type&&<InfoRow icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>} label="Content Type" value={result.last_http_response_content_type} t={t}/>}
-                {result.last_http_response_content_length&&<InfoRow icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>} label="Response Size" value={`${(result.last_http_response_content_length/1024).toFixed(1)} KB`} t={t}/>}
+            <div id="panel-Intel" role="tabpanel" aria-labelledby="tab-Intel" tabIndex={0} hidden={tab!=="Intel"} style={{display:"flex",flexDirection:"column",gap:8}}>
+                <InfoRow icon={<svg aria-hidden="true" focusable="false" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>} label="Final URL" value={result.url||scannedUrl} t={t}/>
+                {result.tld&&<InfoRow icon={<svg aria-hidden="true" focusable="false" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>} label="TLD" value={result.tld} t={t}/>}
+                {result.last_http_response_code&&<InfoRow icon={<svg aria-hidden="true" focusable="false" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>} label="HTTP Status" value={`${result.last_http_response_code}`} color={result.last_http_response_code===200?t.green:t.yellow} t={t}/>}
+                {result.last_http_response_content_type&&<InfoRow icon={<svg aria-hidden="true" focusable="false" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>} label="Content Type" value={result.last_http_response_content_type} t={t}/>}
+                {result.last_http_response_content_length&&<InfoRow icon={<svg aria-hidden="true" focusable="false" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>} label="Response Size" value={`${(result.last_http_response_content_length/1024).toFixed(1)} KB`} t={t}/>}
                 {redirects.length>0&&(
                   <div style={{padding:"12px 14px",borderRadius:12,background:t.inputBg,border:`1px solid ${t.yellow}44`}}>
-                    <div style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,letterSpacing:1,textTransform:"uppercase",marginBottom:8,display:"flex",alignItems:"center",gap:5}}><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>Redirect Chain ({redirects.length} hops)</div>
+                    <div style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,letterSpacing:1,textTransform:"uppercase",marginBottom:8,display:"flex",alignItems:"center",gap:5}}><svg aria-hidden="true" focusable="false" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>Redirect Chain ({redirects.length} hops)</div>
                     {redirects.map((r,i)=>(
                       <div key={i} style={{display:"flex",gap:8,alignItems:"flex-start",marginBottom:i<redirects.length-1?6:0}}>
                         <span style={{fontFamily:"JetBrains Mono",fontSize:9,color:t.muted,flexShrink:0,paddingTop:1}}>#{i+1}</span>
@@ -760,14 +812,12 @@ export default function App(){
                     ))}
                   </div>
                 )}
-                {redirects.length===0&&<InfoRow icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.green} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>} label="Redirects" value="No redirects detected" color={t.green} t={t}/>}
+                {redirects.length===0&&<InfoRow icon={<svg aria-hidden="true" focusable="false" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.green} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>} label="Redirects" value="No redirects detected" color={t.green} t={t}/>}
                 <SSLCard ssl={ssl} t={t}/>
               </div>
-            )}
 
             {/* ── Charts ────────────────────────────────────── */}
-            {tab==="Charts"&&(
-              <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            <div id="panel-Charts" role="tabpanel" aria-labelledby="tab-Charts" tabIndex={0} hidden={tab!=="Charts"} style={{display:"flex",flexDirection:"column",gap:12}}>
                 <div style={{display:"flex",gap:12,alignItems:"center",justifyContent:"center",padding:16,borderRadius:14,background:t.inputBg,border:`1px solid ${t.border}`,flexWrap:"wrap"}}>
                   <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
                     <span style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,letterSpacing:1,textTransform:"uppercase"}}>Distribution</span>
@@ -791,11 +841,9 @@ export default function App(){
                   ))}
                 </div>
               </div>
-            )}
 
             {/* ── Engines ───────────────────────────────────── */}
-            {tab==="Engines"&&(
-              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            <div id="panel-Engines" role="tabpanel" aria-labelledby="tab-Engines" tabIndex={0} hidden={tab!=="Engines"} style={{display:"flex",flexDirection:"column",gap:10}}>
                 {flagged.length>0&&(
                   <div>
                     <div style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,letterSpacing:1,marginBottom:6,textTransform:"uppercase"}}>Flagged ({flagged.length})</div>
@@ -829,15 +877,12 @@ export default function App(){
                   </details>
                 )}
               </div>
-            )}
 
             {/* ── SSL tab ───────────────────────────────────── */}
-            {tab==="SSL"&&(
-              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <div id="panel-SSL" role="tabpanel" aria-labelledby="tab-SSL" tabIndex={0} hidden={tab!=="SSL"} style={{display:"flex",flexDirection:"column",gap:8}}>
                 <div style={{fontSize:9,fontFamily:"JetBrains Mono",color:t.muted,letterSpacing:1,textTransform:"uppercase"}}>SSL / TLS Certificate</div>
                 <SSLCard ssl={ssl} t={t}/>
               </div>
-            )}
 
 
 
@@ -859,12 +904,12 @@ export default function App(){
           onMouseEnter={e=>e.currentTarget.style.borderColor=t.green}
           onMouseLeave={e=>e.currentTarget.style.borderColor=t.border}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg aria-hidden="true" focusable="false" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
             </svg>
             <span style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:700,fontSize:12,color:t.muted}}>About &amp; How to Use</span>
           </div>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+          <svg aria-hidden="true" focusable="false" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
             style={{transition:"transform 0.2s",transform:showAbout?"rotate(180deg)":"rotate(0deg)"}}>
             <polyline points="6 9 12 15 18 9"/>
           </svg>
@@ -874,7 +919,7 @@ export default function App(){
             {/* What is LinkGuard */}
             <div style={{display:"flex",flexDirection:"column",gap:6}}>
               <div style={{display:"flex",alignItems:"center",gap:7}}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={t.green} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg aria-hidden="true" focusable="false" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={t.green} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                 </svg>
                 <span style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:800,fontSize:13,color:t.text}}>What is LinkGuard?</span>
@@ -886,12 +931,12 @@ export default function App(){
             <div style={{display:"flex",flexDirection:"column",gap:4}}>
               <span style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:800,fontSize:13,color:t.text,marginBottom:4}}>How to use</span>
               {[
-                {icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,title:"Paste or type a URL",desc:"Pasting auto-starts the scan instantly."},
-                {icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,title:"Hit Scan",desc:"70+ engines analyse the link in 15–30 seconds."},
-                {icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h.01M18 14h.01M14 18h.01M18 18h.01"/></svg>,title:"QR codes",desc:"Tap 'Scan QR Code' to decode a QR image from your camera or photos."},
-                {icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>,title:"Bulk scan",desc:"Toggle Bulk mode to check multiple URLs at once."},
-                {icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,title:"Export report",desc:"Download a full JSON report for sharing or record-keeping."},
-                {icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>,title:"Read the tabs",desc:"Overview · Intel · Charts · Engines · SSL — swipe or tap to explore."},
+                {icon:<svg aria-hidden="true" focusable="false" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,title:"Paste or type a URL",desc:"Pasting auto-starts the scan instantly."},
+                {icon:<svg aria-hidden="true" focusable="false" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,title:"Hit Scan",desc:"70+ engines analyse the link in 15–30 seconds."},
+                {icon:<svg aria-hidden="true" focusable="false" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h.01M18 14h.01M14 18h.01M18 18h.01"/></svg>,title:"QR codes",desc:"Tap 'Scan QR Code' to decode a QR image from your camera or photos."},
+                {icon:<svg aria-hidden="true" focusable="false" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>,title:"Bulk scan",desc:"Toggle Bulk mode to check multiple URLs at once."},
+                {icon:<svg aria-hidden="true" focusable="false" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,title:"Export report",desc:"Download a full JSON report for sharing or record-keeping."},
+                {icon:<svg aria-hidden="true" focusable="false" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>,title:"Read the tabs",desc:"Overview · Intel · Charts · Engines · SSL — swipe or tap to explore."},
               ].map(({icon,title,desc})=>(
                 <div key={title} style={{display:"flex",gap:10,alignItems:"flex-start",padding:"7px 10px",borderRadius:9,background:t.inputBg}}>
                   <span style={{flexShrink:0,marginTop:2}}>{icon}</span>
@@ -902,7 +947,7 @@ export default function App(){
             <div style={{width:"100%",height:1,background:t.border}}/>
             {/* Rate limit note */}
             <div style={{display:"flex",gap:9,padding:"9px 11px",borderRadius:9,background:`${t.yellow}0d`,border:`1px solid ${t.yellow}33`,alignItems:"flex-start"}}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={t.yellow} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0,marginTop:1}}>
+              <svg aria-hidden="true" focusable="false" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={t.yellow} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0,marginTop:1}}>
                 <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
               </svg>
               <p style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:11,color:t.muted,lineHeight:1.65}}>Powered by a <strong style={{color:t.text}}>multi-engine threat intelligence network</strong> with daily scan limits. Results are cached; hit Re-scan if data looks stale.</p>
@@ -917,11 +962,11 @@ export default function App(){
         <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",justifyContent:"center"}}>
           {[
             {href:"https://www.linkedin.com/in/carlos-miguel-torres-2644a9332/",label:"LinkedIn",hc:"#0a66c2",
-              icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>},
+              icon:<svg aria-hidden="true" focusable="false" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>},
             {href:"https://www.facebook.com/JenxxAi",label:"Facebook",hc:"#1877f2",
-              icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>},
+              icon:<svg aria-hidden="true" focusable="false" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>},
             {href:"https://github.com/JenxxAI",label:"GitHub",hc:t.text,
-              icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>}
+              icon:<svg aria-hidden="true" focusable="false" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>}
           ].map(({href,label,hc,icon})=>(
             <a key={label} href={href} target="_blank" rel="noopener noreferrer"
               style={{display:"flex",alignItems:"center",gap:5,color:t.muted,textDecoration:"none",fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:11,fontWeight:600,padding:"6px 12px",borderRadius:8,border:`1px solid ${t.border}`,background:t.surface,transition:"all 0.2s"}}
