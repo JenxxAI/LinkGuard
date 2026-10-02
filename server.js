@@ -267,7 +267,7 @@ app.get('/api/share/:key', (req, res) => {
 if (existsSync(DIST)) {
   app.use(express.static(DIST));
   // SPA fallback — let React Router (if ever added) or index.html handle the route
-  app.get('*', (_req, res) => res.sendFile(join(DIST, 'index.html')));
+  app.get('/{*splat}', (_req, res) => res.sendFile(join(DIST, 'index.html')));
 }
 
 export { app };
