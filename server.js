@@ -151,22 +151,15 @@ app.get('/api/analyses/:id', async (req, res) => {
 
 // GET /api/expand?url=... — follow redirects to reveal where short URLs lead
 // SSRF protection: only allow http/https to public addresses
-const PRIVATE_RANGES = new Set([
-  'private',
-  'loopback',
-  'linkLocal',
-  'uniqueLocal',
-  'unspecified',
-  'broadcast',
-  'multicast',
-  'reserved',
-]);
+const MAX_REDIRECTS = 5;
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
 function isPrivateHostname(hostname) {
-  const normalized = hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  const normalized = hostname.replace(/^\[|\]$/g, '').toLowerCase().replace(/\.$/, '');
   if (normalized === 'localhost' || normalized.endsWith('.localhost')) return true;
   if (!ipaddr.isValid(normalized)) return false;
-  return PRIVATE_RANGES.has(ipaddr.parse(normalized).range());
+  // Normalize IPv4-mapped IPv6 before checking; only global unicast is allowed.
+  return ipaddr.process(normalized).range() !== 'unicast';
 }
 
 async function resolvesToPrivateAddress(hostname) {
@@ -192,15 +185,18 @@ async function validatePublicUrl(url) {
 }
 
 app.get('/api/expand', async (req, res) => {
-  const url = req.query.url?.trim();
+  const url = typeof req.query.url === 'string' ? req.query.url.trim() : '';
   if (!url) return res.status(400).json({ error: 'Missing url' });
   let parsed;
   try { parsed = new URL(url); } catch { return res.status(400).json({ error: 'Invalid URL' }); }
   try {
     let currentUrl = parsed.href;
-    for (let redirectCount = 0; redirectCount <= 5; redirectCount += 1) {
+    for (let redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount += 1) {
       const validation = await validatePublicUrl(currentUrl);
-      if (!validation.valid) return res.status(400).json({ error: validation.message });
+      if (!validation.valid) {
+        if (redirectCount > 0) return res.json({ resolved: parsed.href });
+        return res.status(400).json({ error: validation.message });
+      }
 
       const r = await fetch(currentUrl, {
         method: 'HEAD',
@@ -208,7 +204,8 @@ app.get('/api/expand', async (req, res) => {
         signal: AbortSignal.timeout(5000),
         headers: { 'User-Agent': 'LinkGuard/1.0' },
       });
-      if (![301, 302, 303, 307, 308].includes(r.status)) {
+      await r.body?.cancel();
+      if (!REDIRECT_STATUSES.has(r.status)) {
         const finalUrl = r.url || currentUrl;
         const finalValidation = await validatePublicUrl(finalUrl);
         if (!finalValidation.valid) return res.json({ resolved: currentUrl });
@@ -219,7 +216,7 @@ app.get('/api/expand', async (req, res) => {
       if (!location) return res.json({ resolved: currentUrl });
       try { currentUrl = new URL(location, currentUrl).href; } catch { return res.json({ resolved: currentUrl }); }
     }
-    return res.status(508).json({ error: 'Too many redirects.' });
+    return res.json({ resolved: parsed.href });
   } catch {
     res.json({ resolved: parsed.href });
   }
