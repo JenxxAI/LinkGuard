@@ -14,4 +14,4 @@ jobs:
       - name: Check Render health endpoint
         env:
           HEALTH_URL: https://linkguard-rola.onrender.com/api/health
-        run: curl --fail --silent --show-error --max-time 30 "$HEALTH_URL"
+        run: curl --fail --silent --show-error --retry 2 --retry-delay 10 --retry-all-errors --max-time 90 "$HEALTH_URL"
